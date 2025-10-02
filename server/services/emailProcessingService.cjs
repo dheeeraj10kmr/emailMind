@@ -305,7 +305,7 @@ setOutlookConfig(config) {
 
   // Connect to email provider
   async connectToEmail(connection, credentials) {
-    let client = null;
+    //let client = null;
     
     try {
       this.logService.log('EMAIL_CONNECT_START', 'Starting email connection', { 
@@ -326,18 +326,27 @@ setOutlookConfig(config) {
       }
 
       let imapConfig;
-      const decryptedAccessToken = fullConnectionDetails.access_token; // Already decrypted by getEmailConnectionById
+      const isOAuth = credentials.type === 'oauth';
+      const secret = credentials.secret;
+
+      if (!secret) {
+        throw new Error('Missing authentication secret for email connection');
+      }
 
       if (connectionConfig.email_provider === 'outlook') {
         imapConfig = {
           host: 'outlook.office365.com',
           port: 993,
           secure: true,
-          auth: {
-            user: connectionConfig.email_address, // This should be the email address associated with the token
-            accessToken: decryptedAccessToken 
-          },
-          authMethod: 'XOAUTH2' 
+          auth: isOAuth
+            ? {
+                user: connection.email_address,
+                accessToken: secret
+              }
+            : {
+                user: connection.email_address,
+                pass: secret
+              } 
         };
       } else if (connectionConfig.email_provider === 'gmail') {
 																			   
@@ -347,9 +356,8 @@ setOutlookConfig(config) {
           secure: true,
           auth: {
             user: connectionConfig.email_address, // This should be the email address associated with the token
-            accessToken: decryptedAccessToken 
+            pass: secret
           },
-          authMethod: 'XOAUTH2' 
         };
       } else {
         throw new Error(`Unsupported email provider: ${connectionConfig.email_provider}`);
@@ -547,7 +555,10 @@ setOutlookConfig(config) {
         domain: connection.domain_id 
       });
 
-      client = await this.connectToEmail(connection);
+      //client = await this.connectToEmail(connection);
+      const credentials = await this.resolveConnectionCredentials(connection);
+      const credentials = await this.resolveConnectionCredentials(connection);
+      client = await this.connectToEmail(connection, credentials);
       
       // Select INBOX
       await client.mailboxOpen('INBOX');
