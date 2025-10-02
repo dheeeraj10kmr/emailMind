@@ -103,6 +103,32 @@ export default function SuperAdminDashboard() {
     loadAppSettings();
   }, []);
 
+  const loadClientEmailConnections = useCallback(async (domainId: string) => {
+    setClientEmailConnectionsLoading(true);
+    try {
+      const apiService = ApiService.getInstance();
+      const result = await apiService.getEmailConnections(domainId);
+      if (result.success) {
+        setClientEmailConnections(Array.isArray(result.connections) ? result.connections : []);
+        setClientOauthStatus('idle');
+        setClientOauthMessage('');
+        if (!Array.isArray(result.connections)) {
+          console.warn('Email connections response missing connections array for domain', domainId, result);
+        }
+      } else {
+        setClientEmailConnections([]);
+        setClientOauthStatus('error');
+        setClientOauthMessage(result.message || 'Failed to load connections.');
+      }
+    } catch (error) {
+      console.error(`Failed to load email connections for domain ${domainId}:`, error);
+      setClientOauthStatus('error');
+      setClientOauthMessage(`Failed to load connections: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setClientEmailConnections([]);
+    } finally {
+      setClientEmailConnectionsLoading(false);
+    }
+  }, []);
   // Effect to load domain-specific email settings and connections when selectedDomainForEmail changes
   useEffect(() => {
     if (selectedDomainForEmail && showDomainEmailSettingsModal) {
@@ -305,7 +331,7 @@ export default function SuperAdminDashboard() {
   };
 
   // --- Client Email Connections Management ---
-    const loadClientEmailConnections = useCallback(async (domainId: string) => {
+  /*  const loadClientEmailConnections = useCallback(async (domainId: string) => {
     setClientEmailConnectionsLoading(true);
     try {
       const apiService = ApiService.getInstance();
@@ -331,6 +357,7 @@ export default function SuperAdminDashboard() {
       setClientEmailConnectionsLoading(false);
     }
   }, []);
+  */
 
   // Check for OAuth callback status when the component mounts
   useEffect(() => {
