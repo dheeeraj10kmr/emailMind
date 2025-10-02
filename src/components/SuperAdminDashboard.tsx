@@ -343,26 +343,45 @@ export default function SuperAdminDashboard() {
     // 1. Save the new connection details
     const apiService = ApiService.getInstance();
     const saveResult = await apiService.createEmailConnection(connectionPayload);
+    console.log('Save connection result:', saveResult);
 
-    if (saveResult.success && saveResult.connection) {
-      alert('Email connection details saved. Now initiating OAuth flow...');
-
-      // 2. Initiate OAuth flow using the newly created connection's ID
-      const oauthResult = await apiService.initiateOutlookOAuth(saveResult.connection.id);
-      if (oauthResult.success && oauthResult.authUrl) {
-        // Store the connectionId in local storage so we can retrieve it after redirect
-        localStorage.setItem('oauth_target_connection_id', saveResult.connection.id);
-        window.location.href = oauthResult.authUrl; // Redirect to Outlook for authentication
-      } else {
-        setClientOauthStatus('error');
-        setClientOauthMessage('Failed to get Outlook authorization URL after saving connection.');
-        setIsLoading(false);
-      }
-    } else {
+    if (!saveResult || !saveResult.success) {
       setClientOauthStatus('error');
-      setClientOauthMessage(`Failed to save connection details: ${saveResult.message || 'Unknown error'}`);
+      setClientOauthMessage(`Failed to save connection details: ${saveResult?.message || 'Unknown error'}`);
       setIsLoading(false);
+      return;
     }
+
+    if (!saveResult.connection || !saveResult.connection.id) {
+      setClientOauthStatus('error');
+      setClientOauthMessage('Connection saved but ID is missing. Please refresh and try again.');
+      setIsLoading(false);
+      return;
+    }
+
+    alert('Email connection details saved. Now initiating OAuth flow...');
+
+    // 2. Initiate OAuth flow using the newly created connection's ID
+    const oauthResult = await apiService.initiateOutlookOAuth(saveResult.connection.id);
+    console.log('OAuth initiate result:', oauthResult);
+
+    if (!oauthResult || !oauthResult.success) {
+      setClientOauthStatus('error');
+      setClientOauthMessage(`Failed to initiate OAuth: ${oauthResult?.message || 'Unknown error'}`);
+      setIsLoading(false);
+      return;
+    }
+
+    if (!oauthResult.authUrl) {
+      setClientOauthStatus('error');
+      setClientOauthMessage('OAuth initiated but authorization URL is missing.');
+      setIsLoading(false);
+      return;
+    }
+
+    // Store the connectionId in local storage so we can retrieve it after redirect
+    localStorage.setItem('oauth_target_connection_id', saveResult.connection.id);
+    window.location.href = oauthResult.authUrl; // Redirect to Outlook for authentication
   } catch (error) {
     console.error('Error adding email connection:', error);
     setClientOauthStatus('error');
