@@ -215,11 +215,226 @@ app.post('/api/domains', async (req, res) => {
 
 // /api/configure-email, /api/email-status, /api/test-email, /api/app-settings
 // ... [same logic as original file for brevity, all routes preserved] ...
+// Email connection management (user-level and domain-level)
+app.get('/api/email-connections', async (req, res) => {
+  try {
+    const domainId = req.query.domainId;
+    const isSuperAdmin = req.user.role === 'super_admin';
 
+    if (domainId) {
+      if (!isSuperAdmin && req.user.domainId !== domainId) {
+        return res.status(403).json({ success: false, message: 'Not authorized to view this domain.' });
+      }
+
+      const connections = await domainEmailService.getConnectionsForDomain(domainId);
+      return res.json({ success: true, connections });
+    }
+
+    const result = await dbManager.query(
+      `SELECT id, email_address, provider, status, last_sync, created_at
+       FROM email_connections
+       WHERE user_id = ?
+       ORDER BY created_at DESC`,
+      [req.user.userId]
+    );
+
+    const connections = result.rows.map((row) => ({
+      id: row.id,
+      email_address: row.email_address,
+      provider: row.provider,
+      status: row.status,
+      last_sync: row.last_sync,
+      created_at: row.created_at
+    }));
+
+    res.json({ success: true, connections });
+  } catch (error) {
+    logService.log('EMAIL_CONNECTION_LIST_ERROR', 'Failed to fetch email connections', { error: error.message });
+    res.status(500).json({ success: false, message: 'Failed to fetch email connections.' });
+  }
+});
+
+app.post('/api/email-connections', async (req, res) => {
+  try {
+    const {
+      emailAddress,
+      emailProvider,
+      clientId,
+      clientSecret,
+      redirectUri,
+      authUrl,
+      tokenUrl,
+      scope,
+      email_address,
+      provider,
+      password,
+      id
+    } = req.body;
+
+    const queryDomainId = req.query.domainId;
+    const bodyDomainId = req.body.domainId;
+    const targetDomainId = queryDomainId || bodyDomainId || req.user.domainId;
+    const isSuperAdmin = req.user.role === 'super_admin';
+
+    const isDomainLevelRequest = Boolean(clientId && clientSecret && redirectUri && authUrl && tokenUrl && scope);
+
+    if (isDomainLevelRequest) {
+      if (!targetDomainId) {
+        return res.status(400).json({ success: false, message: 'domainId is required for domain configuration.' });
+      }
+
+      if (!isSuperAdmin && req.user.domainId !== targetDomainId) {
+        return res.status(403).json({ success: false, message: 'Not authorized to configure this domain.' });
+      }
+      
 // ------------------- Email Processing / Logs / OAuth / Connections -------------------
 // All other routes remain identical as in the original file, with calls to
 // EmailProcessingService, LogService, and ConfigService, including Outlook OAuth callbacks
+const connection = await domainEmailService.saveDomainConnection({
+        id,
+        domainId: targetDomainId,
+        emailAddress: emailAddress || null,
+        emailProvider: emailProvider || 'outlook',
+        clientId,
+        clientSecret,
+        redirectUri,
+        authUrl,
+        tokenUrl,
+        scope
+      });
 
+      return res.status(201).json({
+        success: true,
+        message: 'Domain email OAuth configuration saved successfully.',
+        connection
+      });
+    }
+
+    if (!email_address || !provider || !password) {
+      return res.status(400).json({ success: false, message: 'email_address, provider and password are required.' });
+    }
+
+    const domainId = req.user.domainId || null;
+    const emailProcessingService = EmailProcessingService.getInstance();
+    const encryptedPassword = emailProcessingService.encryptCredentials(password);
+
+    const connectionId = dbManager.generateUUID();
+
+    await dbManager.query(
+      `INSERT INTO email_connections (id, user_id, domain_id, email_address, provider, access_token_encrypted, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())`,
+      [
+        connectionId,
+        req.user.userId,
+        domainId,
+        email_address,
+        provider,
+        encryptedPassword
+      ]
+    );
+
+    logService.log('EMAIL_CONNECTION_CREATED', 'User email connection created', {
+      userId: req.user.userId,
+      email: email_address,
+      provider
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Email connection saved successfully.',
+      connection: {
+        id: connectionId,
+        email_address,
+        provider,
+        status: 'pending',
+        last_sync: null,
+        created_at: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    logService.log('EMAIL_CONNECTION_CREATE_ERROR', 'Failed to create email connection', { error: error.message });
+    res.status(500).json({ success: false, message: 'Failed to create email connection.' });
+  }
+});
+
+app.delete('/api/email-connections/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const domainId = req.query.domainId;
+    const isSuperAdmin = req.user.role === 'super_admin';
+
+    if (domainId) {
+      if (!isSuperAdmin && req.user.domainId !== domainId) {
+        return res.status(403).json({ success: false, message: 'Not authorized to delete this domain connection.' });
+      }
+
+      await domainEmailService.deleteDomainConnection(id, domainId);
+      return res.json({ success: true, message: 'Domain email connection deleted.' });
+    }
+
+    await dbManager.query(
+      `DELETE FROM email_connections WHERE id = ? AND user_id = ?`,
+      [id, req.user.userId]
+    );
+
+    logService.log('EMAIL_CONNECTION_DELETED', 'User email connection deleted', {
+      userId: req.user.userId,
+      connectionId: id
+    });
+
+    res.json({ success: true, message: 'Email connection deleted.' });
+  } catch (error) {
+    logService.log('EMAIL_CONNECTION_DELETE_ERROR', 'Failed to delete email connection', { error: error.message });
+    res.status(500).json({ success: false, message: 'Failed to delete email connection.' });
+  }
+});
+
+app.get('/api/oauth/outlook/initiate', async (req, res) => {
+  try {
+    const { connectionId } = req.query;
+    if (!connectionId) {
+      return res.status(400).json({ success: false, message: 'connectionId is required.' });
+    }
+
+    const connection = await domainEmailService.getConnectionById(connectionId);
+    if (!connection) {
+      return res.status(404).json({ success: false, message: 'Connection not found.' });
+    }
+
+    const isSuperAdmin = req.user.role === 'super_admin';
+    if (!isSuperAdmin && connection.domain_id !== req.user.domainId) {
+      return res.status(403).json({ success: false, message: 'Not authorized to initiate OAuth for this connection.' });
+    }
+
+    const stateData = JSON.stringify({
+      connectionId,
+      ts: Date.now()
+    });
+
+    let statePayload;
+    try {
+      statePayload = Buffer.from(stateData).toString('base64url');
+    } catch (err) {
+      statePayload = Buffer.from(stateData)
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/g, '');
+    }
+
+    const authUrl = domainEmailService.buildAuthorizationUrl(connection, statePayload);
+
+    logService.log('OAUTH_OUTLOOK_INITIATED', 'Initiated Outlook OAuth flow', {
+      connectionId,
+      domainId: connection.domain_id
+    });
+
+    res.json({ success: true, authUrl, state: statePayload });
+  } catch (error) {
+    logService.log('OAUTH_OUTLOOK_INITIATE_ERROR', 'Failed to initiate Outlook OAuth', { error: error.message });
+    res.status(500).json({ success: false, message: 'Failed to initiate OAuth flow.' });
+  }
+});
 // ------------------- Start Server -------------------
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
