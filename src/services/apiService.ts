@@ -1,3 +1,4 @@
+// file: src/services/apiService.ts
 class ApiService {
   private baseURL: string;
 
@@ -15,24 +16,49 @@ class ApiService {
   private static instance: ApiService;
 
   private async request(endpoint: string, options: RequestInit = {}): Promise<any> {
-    const token = localStorage.getItem('auth_token');
-    
-    const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-      ...options,
-    };
+    try {
+      const token = localStorage.getItem('auth_token');
 
-    const response = await fetch(`${this.baseURL}${endpoint}`, config);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const config: RequestInit = {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+          ...options.headers,
+        },
+        ...options,
+      };
+
+      const response = await fetch(`${this.baseURL}${endpoint}`, config);
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { message: response.statusText };
+        }
+
+        // Return error in a format the frontend expects
+        return {
+          success: false,
+          message: errorData.message || `HTTP error! status: ${response.status}`,
+          status: response.status
+        };
+      }
+
+      const data = await response.json();
+      // Ensure we always have a success field
+      if (data.success === undefined) {
+        data.success = true;
+      }
+      return data;
+    } catch (error) {
+      console.error('API request failed:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Network error occurred'
+      };
     }
-    
-    return response.json();
   }
 
   // Authentication methods
@@ -74,24 +100,17 @@ class ApiService {
     return this.request('/domains');
   }
 
-  // Email configuration methods
-  async configureEmail(emailConfig: any) {
-    return this.request('/configure-email', {
-      method: 'POST',
-      body: JSON.stringify(emailConfig),
+  async deleteDomain(id: string) { // NEW
+			
+    return this.request(`/domains/${id}`, { // Corrected endpoint path
+      method: 'DELETE',
+		  
     });
   }
 
-  async getEmailStatus() {
-    return this.request('/email-status');
-  }
+  // Removed domain-smtp-settings methods
 
-  async testEmail(email: string) {
-    return this.request('/test-email', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    });
-  }
+  // Removed global SMTP configuration methods
 
   // Database methods
   async testDatabaseConnection() {
@@ -105,8 +124,9 @@ class ApiService {
   }
 
   // Email processing methods
-  async startEmailProcessing() {
-    return this.request('/email-processing/start', {
+  async startEmailProcessing(domainId?: string) { // Added optional domainId
+    const query = domainId ? `?domainId=${domainId}` : '';
+    return this.request(`/email-processing/start${query}`, {
       method: 'POST',
     });
   }
@@ -115,12 +135,14 @@ class ApiService {
     return this.request('/email-processing/status');
   }
 
-  async getProcessedEmails() {
-    return this.request('/processed-emails');
+  async getProcessedEmails(domainId?: string) { // Added optional domainId
+    const query = domainId ? `?domainId=${domainId}` : '';
+    return this.request(`/processed-emails${query}`);
   }
 
-  async getExtractedOrders() {
-    return this.request('/extracted-orders');
+  async getExtractedOrders(domainId?: string) { // Added optional domainId
+    const query = domainId ? `?domainId=${domainId}` : '';
+    return this.request(`/extracted-orders${query}`);
   }
 
   async getLogs(limit = 100, logType = '') {
@@ -132,27 +154,51 @@ class ApiService {
     return this.request(`/logs${queryString ? '?' + queryString : ''}`);
   }
 
-  // Email connections methods
-  async createEmailConnection(connectionData: any) {
-    return this.request('/email-connections', {
+  // Application Settings methods
+  async getAppSettings() {
+    return this.request('/app-settings');
+  }
+
+  async updateAppSetting(key: string, value: string, isSensitive: boolean) {
+    return this.request('/app-settings', {
+      method: 'POST',
+      body: JSON.stringify({ key, value, isSensitive }),
+    });
+  }
+
+  // Email connections methods (for Client Admin/User AND Super Admin)
+  // Super Admin can pass domainId to manage connections for other domains
+  async initiateOutlookOAuth(connectionId: string) { // Now takes connectionId
+														  
+    return this.request(`/oauth/outlook/initiate?connectionId=${connectionId}`);
+  }
+
+  // createEmailConnection is now for saving the initial per-domain OAuth app credentials
+  async createEmailConnection(connectionData: {
+    domainId: string;
+    emailAddress: string;
+    emailProvider: string;
+    clientId: string;
+    clientSecret: string;
+    redirectUri: string;
+    authUrl: string; // NEW
+    tokenUrl: string; // NEW
+    scope: string;    // NEW
+  }) {
+    return this.request(`/email-connections?domainId=${connectionData.domainId}`, {
       method: 'POST',
       body: JSON.stringify(connectionData),
     });
   }
 
-  async getEmailConnections() {
-    return this.request('/email-connections');
+  async getEmailConnections(domainId?: string) {
+    const query = domainId ? `?domainId=${domainId}` : '';
+    return this.request(`/email-connections${query}`);
   }
 
-  async updateEmailConnection(id: string, connectionData: any) {
-    return this.request(`/email-connections/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(connectionData),
-    });
-  }
-
-  async deleteEmailConnection(id: string) {
-    return this.request(`/email-connections/${id}`, {
+  async deleteEmailConnection(id: string, domainId?: string) {
+    const query = domainId ? `?domainId=${domainId}` : '';
+    return this.request(`/email-connections/${id}${query}`, {
       method: 'DELETE',
     });
   }
