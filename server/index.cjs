@@ -5,6 +5,7 @@ const DatabaseManager = require('./config/database.cjs');
 const AuthService = require('./services/authService.cjs');
 const EmailService = require('./services/emailService.cjs');
 const EmailProcessingService = require('./services/emailProcessingService.cjs');
+const DomainEmailService = require('./services/domainEmailService.cjs');
 const LogService = require('./services/logService.cjs');
 
 const app = express();
@@ -21,6 +22,7 @@ const authService = AuthService.getInstance();
 const emailService = EmailService.getInstance();
 const emailProcessingService = EmailProcessingService.getInstance();
 const logService = LogService.getInstance();
+const domainEmailService = DomainEmailService.getInstance();
 
 // Initialize database on startup
 db.initialize().then(result => {
@@ -195,7 +197,67 @@ app.post('/api/test-email', authenticateToken, requireSuperAdmin, async (req, re
     res.status(500).json({ success: false, error: error.message });
   }
 });
+// OAuth authorization for Microsoft Graph
+app.post('/api/oauth/global-graph-authorize', authenticateToken, async (req, res) => {
+  try {
+    const { provider = 'microsoft_graph', redirectUri, connectionId, domainId: payloadDomainId } = req.body;
 
+    const domainId = payloadDomainId || req.user.domainId || null;
+    const metadata = {
+      connectionId: connectionId || null,
+      userId: req.user.userId,
+      domainId,
+      ...(redirectUri ? { redirectUri } : {})
+    };
+
+    const { authorizationUrl } = await domainEmailService.buildAuthorizationUrl({
+      provider,
+      domainId,
+      redirectUri,
+      metadata
+    });
+
+    res.json({ success: true, authorizationUrl });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Microsoft Graph OAuth callback
+app.get('/api/oauth/global-graph-callback', async (req, res) => {
+  const { code, state, error, error_description: errorDescription } = req.query;
+
+  if (error) {
+    logService.log('OAUTH_CALLBACK_ERROR', 'OAuth callback returned an error', {
+      error,
+      errorDescription
+    });
+    return res.status(400).json({ success: false, error: errorDescription || error });
+  }
+
+  let context;
+  try {
+    context = await domainEmailService.consumeNonce(state);
+  } catch (validationError) {
+    return res.status(400).json({ success: false, error: validationError.message });
+  }
+
+  try {
+    const tokens = await domainEmailService.exchangeAuthorizationCode(code, context);
+    await domainEmailService.finalizeNonce(context.nonce);
+
+    res.json({
+      success: true,
+      provider: context.provider,
+      domainId: context.domainId,
+      connectionId: context.metadata?.connectionId || null,
+      tokensStored: Boolean(context.metadata?.connectionId && tokens?.access_token)
+    });
+  } catch (tokenError) {
+    await domainEmailService.finalizeNonce(context.nonce);
+    res.status(500).json({ success: false, error: tokenError.message });
+  }
+});
 // Email connection routes
 app.post('/api/email-connections', authenticateToken, async (req, res) => {
   try {
