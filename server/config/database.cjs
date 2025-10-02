@@ -164,6 +164,18 @@ class DatabaseManager {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (domain_id) REFERENCES domains(id),
         FOREIGN KEY (user_id) REFERENCES users(id)
+        )`,
+
+      // OAuth state tracking table
+      `CREATE TABLE IF NOT EXISTS oauth_states (
+        nonce VARCHAR(128) PRIMARY KEY,
+        domain_id VARCHAR(32),
+        provider VARCHAR(50) NOT NULL,
+        metadata JSON,
+        expires_at DATETIME NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        used_at DATETIME DEFAULT NULL,
+        FOREIGN KEY (domain_id) REFERENCES domains(id)
       )`
     ];
 
