@@ -23,6 +23,7 @@ interface Domain {
   is_active: boolean;
   user_count: number;
   created_at: string;
+  domain_id?: string;
 }
 
 interface EmailConnection {
@@ -70,7 +71,7 @@ export default function SuperAdminDashboard() {
   const [appSettingsLoading, setAppSettingsLoading] = useState(false);
 
   // State for Domain Email Settings Modal
-  const [selectedDomainForEmail, setSelectedDomainForEmail] = useState<string | null>(null);
+  const [selectedDomainForEmail, setSelectedDomainForEmail] = useState<string>('');
   const [clientEmailConnections, setClientEmailConnections] = useState<EmailConnection[]>([]);
   const [clientEmailConnectionsLoading, setClientEmailConnectionsLoading] = useState(false);
   const [isConnectingOutlookForClient, setIsConnectingOutlookForClient] = useState(false);
@@ -108,35 +109,33 @@ export default function SuperAdminDashboard() {
 
   // Check for OAuth callback status when the component mounts
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const status = params.get('oauth_status');
-    const provider = params.get('provider');
-    const message = params.get('message');
-    const connectionId = params.get('connectionId'); // Get the connectionId from callback
+  const params = new URLSearchParams(window.location.search);
+  const status = params.get('oauth_status');
+  const provider = params.get('provider');
+  const message = params.get('message');
+  const connectionId = params.get('connectionId'); 
 
-    if (status && provider && connectionId) {
-      if (status === 'success' && provider === 'outlook') {
-        setClientOauthStatus('success');
-        setClientOauthMessage('Outlook connected successfully!');
-      } else if (status === 'error' && provider === 'outlook') {
-        setClientOauthStatus('error');
-        setClientOauthMessage(`Outlook connection failed: ${message || 'Unknown error'}`);
-      }
-      // After processing the callback, clear the URL parameters
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      // Find the domain associated with this connectionId and open the modal
-      const domain = domains.find(d => clientEmailConnections.some(conn => conn.id === connectionId && conn.domain_id === d.id));
-      if (domain) {
-        setSelectedDomainForEmail(domain.id);
-        setShowDomainEmailSettingsModal(true);
-      } else {
-        // If domain not found in current state, try to reload connections for all domains
-        // or prompt user to select domain manually. For now, just log.
-        console.warn("Could not find domain for returned connectionId:", connectionId);
-      }
-    }
-  }, [domains, clientEmailConnections]); // Depend on domains and clientEmailConnections to find the right domain
+  if (!status || !provider || !connectionId) {
+    return; // Only run this effect for OAuth callbacks
+  }
+
+  if (status === 'success' && provider === 'outlook') {
+    setClientOauthStatus('success');
+    setClientOauthMessage('Outlook connected successfully!');
+  } else if (status === 'error' && provider === 'outlook') {
+    setClientOauthStatus('error');
+    setClientOauthMessage(`Outlook connection failed: ${message || 'Unknown error'}`);
+  }
+  window.history.replaceState({}, document.title, window.location.pathname);
+
+  const domain = domains.find(d => clientEmailConnections.some(conn => conn.id === connectionId && conn.domain_id === d.id));
+  if (domain) {
+    setSelectedDomainForEmail(domain.id);
+    setShowDomainEmailSettingsModal(true);
+  } else {
+    console.warn("Could not find domain for returned connectionId:", connectionId);
+  }
+}, [domains, clientEmailConnections]); // Depend on domains and clientEmailConnections to find the right domain
 
 
   const loadAppSettings = async () => {
@@ -304,8 +303,19 @@ export default function SuperAdminDashboard() {
     setClientEmailConnectionsLoading(true);
     try {
       const apiService = ApiService.getInstance();
-      const result = await apiService.getEmailConnections(domainId); 
-      setClientEmailConnections(result.connections);
+      const result = await apiService.getEmailConnections(domainId);
+      if (result.success) {
+        setClientEmailConnections(Array.isArray(result.connections) ? result.connections : []);
+        setClientOauthStatus('idle');
+        setClientOauthMessage('');
+        if (!Array.isArray(result.connections)) {
+          console.warn('Email connections response missing connections array for domain', domainId, result);
+        }
+      } else {
+        setClientEmailConnections([]);
+        setClientOauthStatus('error');
+        setClientOauthMessage(result.message || 'Failed to load connections.');
+      }
     } catch (error) {
       console.error(`Failed to load email connections for domain ${domainId}:`, error);
       setClientOauthStatus('error');
@@ -653,24 +663,25 @@ export default function SuperAdminDashboard() {
               {/* Domain Selection */}
               <div>
                 <label htmlFor="domain-select" className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Domain
-                </label>
-                <select
-                  id="domain-select"
-                  value={selectedDomainForEmail || ''}
-                  onChange={(e) => {
-                    setSelectedDomainForEmail(e.target.value);
-                    setShowAddEmailConnectionForm(true); // Show email connection form immediately on domain select
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">-- Select a Domain --</option>
-                  {domains.map((domain) => (
-                    <option key={domain.id} value={domain.id}>
-                      {domain.domain_name} - {domain.description}
-                    </option>
-                  ))}
-                </select>
+  Select Domain
+</label>
+<select
+  id="domain-select"
+  value={selectedDomainForEmail}
+  onChange={(e) => {
+    setSelectedDomainForEmail(e.target.value);
+    setShowAddEmailConnectionForm(true); // Show email connection form immediately
+  }}
+  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+>
+  <option value="">-- Select a Domain --</option>
+  {domains.map((domain) => (
+    <option key={domain.id} value={domain.id}>
+      {domain.domain_name} - {domain.description}
+    </option>
+  ))}
+</select>
+
               </div>
 
               {selectedDomainForEmail && (
