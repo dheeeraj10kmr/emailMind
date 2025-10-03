@@ -1,16 +1,9 @@
+// file: server/services/authService.cjs
 const DatabaseManager = require('../config/database.cjs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const LogService = require('./logService.cjs');
-
-// Simple UUID v4 generator function
-function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c == 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  }).replace(/-/g, '');
-}
+const crypto = require('crypto'); // Import crypto module
 
 class AuthService {
   constructor() {
@@ -37,7 +30,7 @@ class AuthService {
       );
 
       if (result.rows.length === 0) {
-        this.logService.log('AUTH_LOGIN_USER_NOT_FOUND', 'User not found or inactive', { username });
+        this.logService.log('AUTH_LOGIN_USER_NOT_FOUND', 'User not found or inactive', { username }, 'WARNING');
         return null;
       }
 
@@ -45,7 +38,7 @@ class AuthService {
       const isValidPassword = await bcrypt.compare(password, user.password_hash);
 
       if (!isValidPassword) {
-        this.logService.log('AUTH_LOGIN_INVALID_PASSWORD', 'Invalid password provided', { username });
+        this.logService.log('AUTH_LOGIN_INVALID_PASSWORD', 'Invalid password provided', { username }, 'WARNING');
         return null;
       }
 
@@ -70,7 +63,7 @@ class AuthService {
         token
       };
     } catch (error) {
-      this.logService.log('AUTH_LOGIN_ERROR', 'Login process failed', { username, error: error.message });
+      this.logService.log('AUTH_LOGIN_ERROR', 'Login process failed', { username, error: error.message }, 'ERROR');
       throw error;
     }
   }
@@ -88,11 +81,11 @@ class AuthService {
       );
 
       if (existingDomain.rows.length > 0) {
-        this.logService.log('DOMAIN_CREATE_EXISTS', 'Domain already exists', { domainName });
+        this.logService.log('DOMAIN_CREATE_EXISTS', 'Domain already exists', { domainName }, 'WARNING');
         throw new Error('Domain already exists');
       }
 
-      const domainId = generateUUID();
+      const domainId = crypto.randomUUID().replace(/-/g, ''); // Use crypto.randomUUID()
       
       await db.query(`
         INSERT INTO domains (id, domain_name, description, is_active, created_at)
@@ -110,7 +103,7 @@ class AuthService {
         created_at: new Date()
       };
     } catch (error) {
-      this.logService.log('DOMAIN_CREATE_ERROR', 'Domain creation failed', { domainName, error: error.message });
+      this.logService.log('DOMAIN_CREATE_ERROR', 'Domain creation failed', { domainName, error: error.message }, 'ERROR');
       throw error;
     }
   }
@@ -132,7 +125,71 @@ class AuthService {
       this.logService.log('DOMAIN_FETCH_SUCCESS', 'Domains fetched successfully', { count: result.rows.length });
       return result.rows;
     } catch (error) {
-      this.logService.log('DOMAIN_FETCH_ERROR', 'Failed to fetch domains', { error: error.message });
+      this.logService.log('DOMAIN_FETCH_ERROR', 'Failed to fetch domains', { error: error.message }, 'ERROR');
+      throw error;
+    }
+  }
+
+async deleteDomain(domainId) {
+    const db = DatabaseManager.getInstance();
+
+    try {
+      this.logService.log('DOMAIN_DELETE_START', 'Starting domain deletion', { domainId });
+
+      const domainResult = await db.query(
+        'SELECT id, domain_name FROM domains WHERE id = ? LIMIT 1',
+        [domainId]
+      );
+
+      if (!domainResult.rows || domainResult.rows.length === 0) {
+        this.logService.log('DOMAIN_DELETE_NOT_FOUND', 'Domain not found for deletion', { domainId }, 'WARNING');
+        const error = new Error('Domain not found');
+        error.code = 'DOMAIN_NOT_FOUND';
+        throw error;
+      }
+
+      const domainName = domainResult.rows[0].domain_name;
+
+      const cascadeDeletes = [
+        { table: 'extracted_orders', sql: 'DELETE FROM extracted_orders WHERE domain_id = ?' },
+        { table: 'processed_emails', sql: 'DELETE FROM processed_emails WHERE domain_id = ?' },
+        { table: 'email_connections', sql: 'DELETE FROM email_connections WHERE domain_id = ?' },
+        { table: 'domain_client_mail_map', sql: 'DELETE FROM domain_client_mail_map WHERE domain_id = ?' },
+        { table: 'system_logs', sql: 'DELETE FROM system_logs WHERE domain_id = ?' },
+        { table: 'users', sql: 'DELETE FROM users WHERE domain_id = ?' }
+      ];
+
+      for (const step of cascadeDeletes) {
+        try {
+          await db.query(step.sql, [domainId]);
+        } catch (stepError) {
+          if (stepError && stepError.code === 'ER_NO_SUCH_TABLE') {
+            this.logService.log('DOMAIN_DELETE_MISSING_TABLE', 'Skipping missing table during domain deletion', {
+              domainId,
+              table: step.table
+            }, 'WARNING');
+            continue;
+          }
+
+          this.logService.log('DOMAIN_DELETE_STEP_ERROR', 'Failed during cascading delete', {
+            domainId,
+            table: step.table,
+            error: stepError.message
+          }, 'ERROR');
+          throw stepError;
+        }
+      }
+
+      await db.query('DELETE FROM domains WHERE id = ?', [domainId]);
+
+      this.logService.log('DOMAIN_DELETE_SUCCESS', 'Domain deleted successfully', {
+        domainId,
+        domainName
+      });
+
+      return { domainId, domainName };
+    } catch (error) {
+      this.logService.log('DOMAIN_DELETE_ERROR', 'Domain deletion failed', { domainId, error: error.message }, 'ERROR');
       throw error;
     }
   }
@@ -143,8 +200,8 @@ class AuthService {
     try {
       this.logService.log('USER_CREATE_START', 'Starting user creation', { username: userData.username });
       
-      const userId = generateUUID();
-      const setupToken = generateUUID();
+      const userId = crypto.randomUUID().replace(/-/g, ''); // Use crypto.randomUUID()
+      const setupToken = crypto.randomUUID().replace(/-/g, ''); // Use crypto.randomUUID()
       const setupTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
       // Get domain ID if domain_name is provided
@@ -158,7 +215,7 @@ class AuthService {
         if (domainResult.rows.length > 0) {
           domainId = domainResult.rows[0].id;
         } else {
-          this.logService.log('USER_CREATE_DOMAIN_NOT_FOUND', 'Domain not found', { domain: userData.domain_name });
+          this.logService.log('USER_CREATE_DOMAIN_NOT_FOUND', 'Domain not found', { domain: userData.domain_name }, 'WARNING');
           throw new Error('Domain not found');
         }
       }
@@ -186,7 +243,7 @@ class AuthService {
         setupToken
       };
     } catch (error) {
-      this.logService.log('USER_CREATE_ERROR', 'User creation failed', { username: userData.username, error: error.message });
+      this.logService.log('USER_CREATE_ERROR', 'User creation failed', { username: userData.username, error: error.message }, 'ERROR');
       throw error;
     }
   }
@@ -203,7 +260,7 @@ class AuthService {
       );
 
       if (tokenResult.rows.length === 0) {
-        this.logService.log('PASSWORD_SETUP_INVALID_TOKEN', 'Invalid or expired setup token', { setupToken });
+        this.logService.log('PASSWORD_SETUP_INVALID_TOKEN', 'Invalid or expired setup token', { setupToken }, 'WARNING');
         return false;
       }
 
@@ -219,7 +276,7 @@ class AuthService {
       this.logService.log('PASSWORD_SETUP_SUCCESS', 'Password setup completed', { userId });
       return true;
     } catch (error) {
-      this.logService.log('PASSWORD_SETUP_ERROR', 'Password setup failed', { setupToken, error: error.message });
+      this.logService.log('PASSWORD_SETUP_ERROR', 'Password setup failed', { setupToken, error: error.message }, 'ERROR');
       throw error;
     }
   }
@@ -241,7 +298,7 @@ class AuthService {
       this.logService.log('CLIENTS_FETCH_SUCCESS', 'Clients fetched successfully', { count: result.rows.length });
       return result.rows;
     } catch (error) {
-      this.logService.log('CLIENTS_FETCH_ERROR', 'Failed to fetch clients', { error: error.message });
+      this.logService.log('CLIENTS_FETCH_ERROR', 'Failed to fetch clients', { error: error.message }, 'ERROR');
       throw error;
     }
   }
