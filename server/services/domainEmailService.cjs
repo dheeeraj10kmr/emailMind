@@ -87,17 +87,29 @@ class DomainEmailService {
       scope
     } = connectionData;
 
+    const sanitizedConnectionData = {
+      emailAddress: emailAddress ?? null,
+      emailProvider: emailProvider ?? null,
+      clientId: clientId ?? null,
+      clientSecret: clientSecret ?? null,
+      redirectUri: redirectUri ?? null,
+      tenantId: tenantId ?? null,
+      authUrl: authUrl ?? null,
+      tokenUrl: tokenUrl ?? null,
+      scope: scope ?? null
+    };
+
     console.log('DEBUG - Connection data received:', {
     domainId,
-    emailAddress,
-    emailProvider,
-    clientId: clientId ? '***' : 'MISSING',
-    clientSecret: clientSecret ? '***' : 'MISSING',
-    redirectUri,
-    tenantId,
-    authUrl,
-    tokenUrl,
-    scope
+    emailAddress: sanitizedConnectionData.emailAddress,
+    emailProvider: sanitizedConnectionData.emailProvider,
+    clientId: sanitizedConnectionData.clientId ? '***' : 'MISSING',
+    clientSecret: sanitizedConnectionData.clientSecret ? '***' : 'MISSING',
+    redirectUri: sanitizedConnectionData.redirectUri,
+    tenantId: sanitizedConnectionData.tenantId,
+    authUrl: sanitizedConnectionData.authUrl,
+    tokenUrl: sanitizedConnectionData.tokenUrl,
+    scope: sanitizedConnectionData.scope
   });
     const existing = await this.db.query(
       `SELECT * FROM domain_client_mail_map WHERE id = ? OR (domain_id = ? AND email_provider = ? AND email_address = ?) LIMIT 1`,
@@ -115,16 +127,16 @@ class DomainEmailService {
          token_type = NULL, error_message = NULL, last_sync = NULL, updated_at = NOW()
          WHERE id = ?`,
         [
-          emailAddress,
-          emailProvider,
-          clientId,
-          clientSecret,
-          redirectUri,
-          tenantId,
-          authUrl,
-          tokenUrl,
-          scope,
-          scope,
+          sanitizedConnectionData.emailAddress,
+          sanitizedConnectionData.emailProvider,
+          sanitizedConnectionData.clientId,
+          sanitizedConnectionData.clientSecret,
+          sanitizedConnectionData.redirectUri,
+          sanitizedConnectionData.tenantId,
+          sanitizedConnectionData.authUrl,
+          sanitizedConnectionData.tokenUrl,
+          sanitizedConnectionData.scope,
+          sanitizedConnectionData.scope,
           connectionId
         ]
       );
@@ -143,18 +155,17 @@ await this.db.query(
      redirect_uri, tenant_id, auth_url, token_url, scope, token_scope, status, created_at, updated_at)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_oauth', NOW(), NOW())`,
   [
-    connectionId,            
-    domainId,
-    emailAddress,
-    emailProvider,
-    clientId,
-    clientSecret,
-    redirectUri,
-    tenantId,
-    authUrl,
-    tokenUrl,
-    scope,
-    scope
+     domainId,
+    sanitizedConnectionData.emailAddress,
+    sanitizedConnectionData.emailProvider,
+    sanitizedConnectionData.clientId,
+    sanitizedConnectionData.clientSecret,
+    sanitizedConnectionData.redirectUri,
+    sanitizedConnectionData.tenantId,
+    sanitizedConnectionData.authUrl,
+    sanitizedConnectionData.tokenUrl,
+    sanitizedConnectionData.scope,
+    sanitizedConnectionData.scope
   ]
 );
       this.logService.log('DOMAIN_EMAIL_CONNECTION_CREATED', 'Created domain email OAuth configuration', {
