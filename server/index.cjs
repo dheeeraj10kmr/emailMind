@@ -410,6 +410,7 @@ app.post('/api/email-connections', async (req, res) => {
       authUrl,
       tokenUrl,
       scope,
+      tenantId,
       email_address,
       provider,
       password,
@@ -445,7 +446,8 @@ const connection = await domainEmailService.saveDomainConnection({
         redirectUri,
         authUrl,
         tokenUrl,
-        scope
+        scope,
+        tenantId: tenantId ?? null
       });
 
       return res.status(201).json({
