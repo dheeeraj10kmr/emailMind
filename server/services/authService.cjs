@@ -134,7 +134,14 @@ async deleteDomain(domainId) {
     const db = DatabaseManager.getInstance();
 
     try {
-      this.logService.log('DOMAIN_DELETE_START', 'Starting domain deletion', { domainId });
+      this.logService.log(
+        'DOMAIN_DELETE_START',
+        'Starting domain deletion',
+        { domainId },
+        'INFO',
+        null,
+        domainId
+      );
 
       const domainResult = await db.query(
         'SELECT id, domain_name FROM domains WHERE id = ? LIMIT 1',
@@ -142,7 +149,14 @@ async deleteDomain(domainId) {
       );
 
       if (!domainResult.rows || domainResult.rows.length === 0) {
-        this.logService.log('DOMAIN_DELETE_NOT_FOUND', 'Domain not found for deletion', { domainId }, 'WARNING');
+        this.logService.log(
+          'DOMAIN_DELETE_NOT_FOUND',
+          'Domain not found for deletion',
+          { domainId },
+          'WARNING',
+          null,
+          domainId
+        );
         const error = new Error('Domain not found');
         error.code = 'DOMAIN_NOT_FOUND';
         throw error;
@@ -161,35 +175,97 @@ async deleteDomain(domainId) {
 
       for (const step of cascadeDeletes) {
         try {
+          this.logService.log(
+            'DOMAIN_DELETE_STEP_START',
+            'Starting cascading delete step',
+            { domainId, table: step.table },
+            'INFO',
+            null,
+            domainId
+          );
           await db.query(step.sql, [domainId]);
+          this.logService.log(
+            'DOMAIN_DELETE_STEP_SUCCESS',
+            'Completed cascading delete step',
+            { domainId, table: step.table },
+            'INFO',
+            null,
+            domainId
+          );
         } catch (stepError) {
           if (stepError && stepError.code === 'ER_NO_SUCH_TABLE') {
-            this.logService.log('DOMAIN_DELETE_MISSING_TABLE', 'Skipping missing table during domain deletion', {
-              domainId,
-              table: step.table
-            }, 'WARNING');
+            this.logService.log(
+              'DOMAIN_DELETE_MISSING_TABLE',
+              'Skipping missing table during domain deletion',
+              {
+                domainId,
+                table: step.table
+              },
+              'WARNING',
+              null,
+              domainId
+            );
             continue;
           }
 
-          this.logService.log('DOMAIN_DELETE_STEP_ERROR', 'Failed during cascading delete', {
-            domainId,
-            table: step.table,
-            error: stepError.message
-          }, 'ERROR');
+          this.logService.log(
+            'DOMAIN_DELETE_STEP_ERROR',
+            'Failed during cascading delete',
+            {
+              domainId,
+              table: step.table,
+              error: stepError.message
+            },
+            'ERROR',
+            null,
+            domainId
+          );
           throw stepError;
         }
       }
 
+this.logService.log(
+        'DOMAIN_DELETE_CASCADE_COMPLETE',
+        'Completed all cascading delete steps',
+        { domainId },
+        'INFO',
+        null,
+        domainId
+      );
+
+      this.logService.log(
+        'DOMAIN_DELETE_FINAL_STEP_START',
+        'Deleting domain record from domains table',
+        { domainId },
+        'INFO',
+        null,
+        domainId
+      );
+
       await db.query('DELETE FROM domains WHERE id = ?', [domainId]);
 
-      this.logService.log('DOMAIN_DELETE_SUCCESS', 'Domain deleted successfully', {
-        domainId,
-        domainName
-      });
+      this.logService.log(
+        'DOMAIN_DELETE_SUCCESS',
+        'Domain deleted successfully',
+        {
+          domainId,
+          domainName
+        },
+        'INFO',
+        null,
+        domainId
+      );
 
       return { domainId, domainName };
     } catch (error) {
-      this.logService.log('DOMAIN_DELETE_ERROR', 'Domain deletion failed', { domainId, error: error.message }, 'ERROR');
+      this.logService.log(
+        'DOMAIN_DELETE_ERROR',
+        'Domain deletion failed',
+        { domainId, error: error.message },
+        'ERROR',
+        null,
+        domainId
+      );
       throw error;
     }
   }
