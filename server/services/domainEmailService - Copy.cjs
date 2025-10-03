@@ -81,7 +81,6 @@ class DomainEmailService {
       clientId,
       clientSecret,
       redirectUri,
-      tenantID,
       authUrl,
       tokenUrl,
       scope
@@ -98,7 +97,7 @@ class DomainEmailService {
       connectionId = existingRow.id;
       await this.db.query(
         `UPDATE domain_client_mail_map
-         SET email_address = ?, email_provider = ?, client_id = ?, client_secret = ?, redirect_uri = ?, tenant_id = ?,auth_url = ?, token_url = ?, scope = ?, token_scope = ?, status = 'pending_oauth', access_token_encrypted = NULL, refresh_token_encrypted = NULL, token_expires_at = NULL, token_type = NULL, error_message = NULL, last_sync = NULL, updated_at = NOW()
+         SET email_address = ?, email_provider = ?, client_id = ?, client_secret = ?, redirect_uri = ?, auth_url = ?, token_url = ?, scope = ?, token_scope = ?, status = 'pending_oauth', access_token_encrypted = NULL, refresh_token_encrypted = NULL, token_expires_at = NULL, token_type = NULL, error_message = NULL, last_sync = NULL, updated_at = NOW()
          WHERE id = ?`,
         [
           emailAddress,
@@ -106,7 +105,6 @@ class DomainEmailService {
           clientId,
           clientSecret,
           redirectUri,
-          tenantID,
           authUrl,
           tokenUrl,
           scope,
@@ -126,7 +124,7 @@ class DomainEmailService {
 await this.db.query(
   `INSERT INTO domain_client_mail_map
     (id, domain_id, email_address, email_provider, client_id, client_secret,
-     redirect_uri, tenant_id, auth_url, token_url, scope, token_scope, status, created_at, updated_at)
+     redirect_uri, auth_url, token_url, scope, token_scope, status, created_at, updated_at)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_oauth', NOW(), NOW())`,
   [
     connectionId,            
@@ -136,7 +134,6 @@ await this.db.query(
     clientId,
     clientSecret,
     redirectUri,
-    tenantID,
     authUrl,
     tokenUrl,
     scope,
@@ -313,7 +310,7 @@ await this.db.query(
   `INSERT INTO email_connections
     (id, user_id, domain_id, email_address, provider,
      access_token_encrypted, refresh_token_encrypted, status,
-     token_expires_at, token_type, token_scope, domain_connection_id, tenant_id,
+     token_expires_at, token_type, token_scope, domain_connection_id,
      created_at, updated_at)
    VALUES (?, ?, ?, ?, ?, ?, ?, 'connected', ?, ?, ?, ?, NOW(), NOW())`,
   [
@@ -327,8 +324,7 @@ await this.db.query(
     tokenExpiresAt,
     tokenType,
     tokenScope,
-    domainConnectionId,
-    tenantID
+    domainConnectionId
   ]
 );
 

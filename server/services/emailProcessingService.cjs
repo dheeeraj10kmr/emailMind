@@ -557,7 +557,6 @@ setOutlookConfig(config) {
 
       //client = await this.connectToEmail(connection);
       const credentials = await this.resolveConnectionCredentials(connection);
-      const credentials = await this.resolveConnectionCredentials(connection);
       client = await this.connectToEmail(connection, credentials);
       
       // Select INBOX
@@ -814,7 +813,7 @@ setOutlookConfig(config) {
   }
 
   // --- Email Connection Management Methods (for domain_client_mail_map) ---
-  async createEmailConnectionEntry(userId, domainId, emailAddress, emailProvider, clientId, clientSecret, redirectUri, accessToken = null, refreshToken = null, expiresIn = null) {
+  async createEmailConnectionEntry(userId, domainId, emailAddress, emailProvider, clientId, clientSecret, redirectUri, tenantID, accessToken = null, refreshToken = null, expiresIn = null) {
     const db = DatabaseManager.getInstance();
     try {
       const connectionId = crypto.randomUUID().replace(/-/g, '');
@@ -833,19 +832,19 @@ setOutlookConfig(config) {
         // Update existing entry
         await db.query(`
           UPDATE domain_client_mail_map
-          SET client_id = ?, client_secret = ?, redirect_uri = ?, refresh_token = ?, access_token = ?, access_token_expires_at = ?, updated_at = NOW()
+          SET client_id = ?, client_secret = ?, redirect_uri = ?, tenant_id = ?, refresh_token = ?, access_token = ?, access_token_expires_at = ?, updated_at = NOW()
           WHERE id = ?
         `, [
-          clientId, encryptedClientSecret, redirectUri, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt, existingEntry.rows[0].id
+          clientId, encryptedClientSecret, redirectUri, tenantID, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt, existingEntry.rows[0].id
         ]);
         this.logService.log('EMAIL_CONNECTION_UPDATE_SUCCESS', 'Email connection entry updated', { emailAddress, domainId });
         return { id: existingEntry.rows[0].id, email_address: emailAddress, email_provider: emailProvider, status: 'updated' };
       } else {
         // Insert new entry
         await db.query(`
-          INSERT INTO domain_client_mail_map (id, domain_id, email_address, email_provider, client_id, client_secret, redirect_uri, refresh_token, access_token, access_token_expires_at, created_at)
+          INSERT INTO domain_client_mail_map (id, domain_id, email_address, email_provider, client_id, client_secret, redirect_uri, tenant_id, refresh_token, access_token, access_token_expires_at, created_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-        `, [connectionId, domainId, emailAddress, emailProvider, clientId, encryptedClientSecret, redirectUri, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt]);
+        `, [connectionId, domainId, emailAddress, emailProvider, clientId, encryptedClientSecret, redirectUri, tenantID, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt]);
         this.logService.log('EMAIL_CONNECTION_CREATE_SUCCESS', 'Email connection entry created', { emailAddress, domainId });
         return { id: connectionId, email_address: emailAddress, email_provider: emailProvider, status: 'created' };
       }
