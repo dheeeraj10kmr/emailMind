@@ -81,12 +81,24 @@ class DomainEmailService {
       clientId,
       clientSecret,
       redirectUri,
-      tenantID,
+      tenantId,
       authUrl,
       tokenUrl,
       scope
     } = connectionData;
 
+    console.log('DEBUG - Connection data received:', {
+    domainId,
+    emailAddress,
+    emailProvider,
+    clientId: clientId ? '***' : 'MISSING',
+    clientSecret: clientSecret ? '***' : 'MISSING',
+    redirectUri,
+    tenantId,
+    authUrl,
+    tokenUrl,
+    scope
+  });
     const existing = await this.db.query(
       `SELECT * FROM domain_client_mail_map WHERE id = ? OR (domain_id = ? AND email_provider = ? AND email_address = ?) LIMIT 1`,
       [id || null, domainId, emailProvider, emailAddress]
@@ -98,7 +110,9 @@ class DomainEmailService {
       connectionId = existingRow.id;
       await this.db.query(
         `UPDATE domain_client_mail_map
-         SET email_address = ?, email_provider = ?, client_id = ?, client_secret = ?, redirect_uri = ?, tenant_id = ?,auth_url = ?, token_url = ?, scope = ?, token_scope = ?, status = 'pending_oauth', access_token_encrypted = NULL, refresh_token_encrypted = NULL, token_expires_at = NULL, token_type = NULL, error_message = NULL, last_sync = NULL, updated_at = NOW()
+         SET email_address = ?, email_provider = ?, client_id = ?, client_secret = ?, redirect_uri = ?, tenant_id = ?, auth_url = ?, token_url = ?, 
+         scope = ?, token_scope = ?, status = 'pending_oauth', access_token_encrypted = NULL, refresh_token_encrypted = NULL, token_expires_at = NULL, 
+         token_type = NULL, error_message = NULL, last_sync = NULL, updated_at = NOW()
          WHERE id = ?`,
         [
           emailAddress,
@@ -106,7 +120,7 @@ class DomainEmailService {
           clientId,
           clientSecret,
           redirectUri,
-          tenantID,
+          tenantId,
           authUrl,
           tokenUrl,
           scope,
@@ -121,13 +135,13 @@ class DomainEmailService {
       });
     } else {
       //connectionId = connectionId || this.db.generateUUID();
-   const connectionId = uuidv4();
+   connectionId = connectionId || uuidv4();
 
 await this.db.query(
   `INSERT INTO domain_client_mail_map
     (id, domain_id, email_address, email_provider, client_id, client_secret,
      redirect_uri, tenant_id, auth_url, token_url, scope, token_scope, status, created_at, updated_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_oauth', NOW(), NOW())`,
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_oauth', NOW(), NOW())`,
   [
     connectionId,            
     domainId,
@@ -136,7 +150,7 @@ await this.db.query(
     clientId,
     clientSecret,
     redirectUri,
-    tenantID,
+    tenantId,
     authUrl,
     tokenUrl,
     scope,
@@ -308,27 +322,27 @@ await this.db.query(
     }
 
     //const newConnectionId = this.db.generateUUID();
-    connectionId = uuidv4();
+    const newConnectionId = uuidv4();
   await this.db.query(
   `INSERT INTO email_connections
     (id, user_id, domain_id, email_address, provider,
      access_token_encrypted, refresh_token_encrypted, status,
      token_expires_at, token_type, token_scope, domain_connection_id, tenant_id,
      created_at, updated_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, 'connected', ?, ?, ?, ?, NOW(), NOW())`,
+   VALUES (?, ?, ?, ?, ?, ?, ?, 'connected', ?, ?, ?, ?, ?, NOW(), NOW())`,
   [
-    connectionId,       
+    newConnectionId,       
     userId,
-    domainId,
-    emailAddress,
-    provider,
-    accessTokenEnc,
-    refreshTokenEnc,
-    tokenExpiresAt,
-    tokenType,
-    tokenScope,
-    domainConnectionId,
-    tenantID
+    connection.domain_id,
+    connection.email_address,
+    connection.email_provider || 'outlook',
+    connection.access_token_encrypted,
+    connection.refresh_token_encrypted,
+    connection.token_expires_at,
+    connection.token_type || 'Bearer',
+    connection.token_scope || connection.scope || null,
+    connection.id,
+    connection.tenant_id || null
   ]
 );
 
