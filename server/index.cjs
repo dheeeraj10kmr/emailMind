@@ -418,12 +418,52 @@ app.post('/api/domains', async (req, res) => {
 });
 
 app.delete('/api/domains/:id', async (req, res) => {
-  if (req.user.role !== 'super_admin') return res.sendStatus(403);
-
   const { id } = req.params;
+
+  logService.log(
+    'DOMAIN_DELETE_REQUEST_RECEIVED',
+    'Domain delete request received',
+    {
+      domainId: id,
+      userId: req.user?.userId || null,
+      role: req.user?.role || null
+    },
+    'INFO',
+    req.user?.userId || null,
+    id || null
+  );
+
+  if (req.user.role !== 'super_admin') {
+    logService.log(
+      'DOMAIN_DELETE_UNAUTHORIZED',
+      'User is not authorized to delete domains',
+      {
+        domainId: id,
+        userId: req.user?.userId || null,
+        roleTried: req.user?.role || null
+      },
+      'WARNING',
+      req.user?.userId || null,
+      req.user?.domainId || id || null
+    );
+    return res.sendStatus(403);
+  }
 
   try {
     const result = await AuthService.getInstance().deleteDomain(id);
+
+    logService.log(
+      'DOMAIN_DELETE_RESPONSE_SUCCESS',
+      'Domain delete operation completed successfully',
+      {
+        domainId: result.domainId,
+        domainName: result.domainName
+      },
+      'INFO',
+      req.user?.userId || null,
+      result.domainId
+    );
+
     res.json({
       success: true,
       message: 'Domain deleted successfully',
@@ -432,6 +472,14 @@ app.delete('/api/domains/:id', async (req, res) => {
     });
   } catch (error) {
     if (error.code === 'DOMAIN_NOT_FOUND') {
+      logService.log(
+        'DOMAIN_DELETE_NOT_FOUND_RESPONSE',
+        'Domain deletion failed because the domain was not found',
+        { domainId: id },
+        'WARNING',
+        req.user?.userId || null,
+        id
+      );
       return res.status(404).json({ success: false, message: 'Domain not found' });
     }
 
