@@ -813,7 +813,7 @@ setOutlookConfig(config) {
   }
 
   // --- Email Connection Management Methods (for domain_client_mail_map) ---
-  async createEmailConnectionEntry(userId, domainId, emailAddress, emailProvider, clientId, clientSecret, redirectUri, tenantID, accessToken = null, refreshToken = null, expiresIn = null) {
+  async createEmailConnectionEntry(userId, domainId, emailAddress, emailProvider, clientId, clientSecret, redirectUri, tenantId, accessToken = null, refreshToken = null, expiresIn = null) {
     const db = DatabaseManager.getInstance();
     try {
       const connectionId = crypto.randomUUID().replace(/-/g, '');
@@ -835,16 +835,17 @@ setOutlookConfig(config) {
           SET client_id = ?, client_secret = ?, redirect_uri = ?, tenant_id = ?, refresh_token = ?, access_token = ?, access_token_expires_at = ?, updated_at = NOW()
           WHERE id = ?
         `, [
-          clientId, encryptedClientSecret, redirectUri, tenantID, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt, existingEntry.rows[0].id
+          clientId, encryptedClientSecret, redirectUri, tenantId, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt, existingEntry.rows[0].id
         ]);
         this.logService.log('EMAIL_CONNECTION_UPDATE_SUCCESS', 'Email connection entry updated', { emailAddress, domainId });
         return { id: existingEntry.rows[0].id, email_address: emailAddress, email_provider: emailProvider, status: 'updated' };
       } else {
         // Insert new entry
         await db.query(`
-          INSERT INTO domain_client_mail_map (id, domain_id, email_address, email_provider, client_id, client_secret, redirect_uri, tenant_id, refresh_token, access_token, access_token_expires_at, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-        `, [connectionId, domainId, emailAddress, emailProvider, clientId, encryptedClientSecret, redirectUri, tenantID, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt]);
+          INSERT INTO domain_client_mail_map (id, domain_id, email_address, email_provider, client_id, client_secret, redirect_uri, tenant_id, 
+          refresh_token, access_token, access_token_expires_at, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        `, [connectionId, domainId, emailAddress, emailProvider, clientId, encryptedClientSecret, redirectUri, tenantId, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt]);
         this.logService.log('EMAIL_CONNECTION_CREATE_SUCCESS', 'Email connection entry created', { emailAddress, domainId });
         return { id: connectionId, email_address: emailAddress, email_provider: emailProvider, status: 'created' };
       }
