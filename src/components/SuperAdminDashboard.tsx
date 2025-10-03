@@ -25,6 +25,7 @@ interface Domain {
   created_at: string;
   domain_id?: string;
 }
+type DomainEmailStatus = 'connected' | 'pending';
 
 interface EmailConnection {
   id: string;
@@ -94,8 +95,11 @@ export default function SuperAdminDashboard() {
     tenantId:'',
     authUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize', // Pre-filled
     tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',   // Pre-filled
-    scope: 'Mail.ReadWrite', // Pre-filled
+    scope: 'offline_access Mail.Read Mail.ReadWrite Mail.Send', // Pre-filled
   });
+
+  const [domainEmailStatuses, setDomainEmailStatuses] = useState<Record<string, DomainEmailStatus>>({});
+  const [processingDomainId, setProcessingDomainId] = useState<string | null>(null);
 
   useEffect(() => {
     loadClients();
@@ -137,39 +141,20 @@ export default function SuperAdminDashboard() {
     } else {
       setClientEmailConnections([]);
     }
-  /* }, [selectedDomainForEmail, showDomainEmailSettingsModal]);
-
-  // Check for OAuth callback status when the component mounts
-  useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const status = params.get('oauth_status');
-  const provider = params.get('provider');
-  const message = params.get('message');
-  const connectionId = params.get('connectionId'); 
-
-  if (!status || !provider || !connectionId) {
-    return; // Only run this effect for OAuth callbacks
-  }
-
-  if (status === 'success' && provider === 'outlook') {
-    setClientOauthStatus('success');
-    setClientOauthMessage('Outlook connected successfully!');
-  } else if (status === 'error' && provider === 'outlook') {
-    setClientOauthStatus('error');
-    setClientOauthMessage(`Outlook connection failed: ${message || 'Unknown error'}`);
-  }
-  window.history.replaceState({}, document.title, window.location.pathname);
-
-  const domain = domains.find(d => clientEmailConnections.some(conn => conn.id === connectionId && conn.domain_id === d.id));
-  if (domain) {
-    setSelectedDomainForEmail(domain.id);
-    setShowDomainEmailSettingsModal(true);
-  } else {
-    console.warn("Could not find domain for returned connectionId:", connectionId);
-  }
-}, [domains, clientEmailConnections]); // Depend on domains and clientEmailConnections to find the right domain
-*/
+  
 }, [selectedDomainForEmail, showDomainEmailSettingsModal, loadClientEmailConnections]);
+
+useEffect(() => {
+    if (!selectedDomainForEmail) {
+      return;
+    }
+
+    const hasConnected = clientEmailConnections.some((connection) => connection.status === 'connected');
+    setDomainEmailStatuses((prev) => ({
+      ...prev,
+      [selectedDomainForEmail]: hasConnected ? 'connected' : 'pending',
+    }));
+  }, [clientEmailConnections, selectedDomainForEmail]);
 
   const loadAppSettings = async () => {
     setAppSettingsLoading(true);
@@ -231,11 +216,47 @@ export default function SuperAdminDashboard() {
     }
   };
 
+const updateDomainEmailStatuses = useCallback(async (domainsList: Domain[]) => {
+    if (!domainsList.length) {
+      setDomainEmailStatuses({});
+      return;
+    }
+
+    const apiService = ApiService.getInstance();
+
+    try {
+      const statusEntries = await Promise.all(
+        domainsList.map(async (domain) => {
+          try {
+            const result = await apiService.getEmailConnections(domain.id);
+            if (result.success && Array.isArray(result.connections)) {
+              const hasConnected = result.connections.some(
+                (connection: EmailConnection) => connection.status === 'connected'
+              );
+              return [domain.id, hasConnected ? 'connected' : 'pending'] as const;
+            }
+          } catch (error) {
+            console.error(`Failed to load email status for domain ${domain.id}:`, error);
+          }
+          return [domain.id, 'pending'] as const;
+        })
+      );
+
+      const statusMap = Object.fromEntries(statusEntries) as Record<string, DomainEmailStatus>;
+      setDomainEmailStatuses(statusMap);
+    } catch (error) {
+      console.error('Failed to update domain email statuses:', error);
+      setDomainEmailStatuses({});
+    }
+  }, []);
+
   const loadDomains = async () => {
     try {
       const apiService = ApiService.getInstance();
       const result = await apiService.getAllDomains();
-      setDomains(result.domains);
+      const domainsList: Domain[] = Array.isArray(result.domains) ? result.domains : [];
+      setDomains(domainsList);
+      updateDomainEmailStatuses(domainsList);
     } catch (error) {
       console.error('Failed to load domains:', error);
     }
@@ -330,35 +351,6 @@ export default function SuperAdminDashboard() {
       setIsLoading(false);
     }
   };
-
-  // --- Client Email Connections Management ---
-  /*  const loadClientEmailConnections = useCallback(async (domainId: string) => {
-    setClientEmailConnectionsLoading(true);
-    try {
-      const apiService = ApiService.getInstance();
-      const result = await apiService.getEmailConnections(domainId);
-      if (result.success) {
-        setClientEmailConnections(Array.isArray(result.connections) ? result.connections : []);
-        setClientOauthStatus('idle');
-        setClientOauthMessage('');
-        if (!Array.isArray(result.connections)) {
-          console.warn('Email connections response missing connections array for domain', domainId, result);
-        }
-      } else {
-        setClientEmailConnections([]);
-        setClientOauthStatus('error');
-        setClientOauthMessage(result.message || 'Failed to load connections.');
-      }
-    } catch (error) {
-      console.error(`Failed to load email connections for domain ${domainId}:`, error);
-      setClientOauthStatus('error');
-      setClientOauthMessage(`Failed to load connections: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setClientEmailConnections([]);
-    } finally {
-      setClientEmailConnectionsLoading(false);
-    }
-  }, []);
-  */
 
   // Check for OAuth callback status when the component mounts
   useEffect(() => {
@@ -497,19 +489,21 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const handleProcessEmailsForDomain = async () => { // NEW: Process Emails for Domain
-    if (!selectedDomainForEmail) {
+  const handleProcessEmailsForDomain = async (domainId?: string) => { // NEW: Process Emails for Domain
+    const targetDomainId = domainId ?? selectedDomainForEmail;
+
+    if (!targetDomainId) {
       alert('Please select a domain first to process emails.');
       return;
     }
-    setIsLoading(true); // Use general loading for this action
+    setProcessingDomainId(targetDomainId);
     try {
       const apiService = ApiService.getInstance();
-      const result = await apiService.startEmailProcessing(selectedDomainForEmail);
+      const result = await apiService.startEmailProcessing(targetDomainId);
       if (result.success) {
-        alert(`Email processing initiated for domain: ${domains.find(d => d.id === selectedDomainForEmail)?.domain_name || selectedDomainForEmail}. Check Processed Orders for results.`);
-        // Optionally navigate to processed orders or show a link
-        navigate(`/orders?domainId=${selectedDomainForEmail}`);
+        const domainName = domains.find(d => d.id === targetDomainId)?.domain_name || targetDomainId;
+        alert(`Email processing initiated for domain: ${domainName}. Check Processed Orders for results.`);
+        navigate(`/orders?domainId=${targetDomainId}`);
       } else {
         alert(`Failed to initiate email processing: ${result.message || 'Unknown error'}`);
       }
@@ -517,7 +511,7 @@ export default function SuperAdminDashboard() {
       console.error('Failed to initiate email processing:', error);
       alert(`Failed to initiate email processing: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      setIsLoading(false);
+      setProcessingDomainId(null);
     }
   };
 
@@ -1030,11 +1024,15 @@ export default function SuperAdminDashboard() {
                         <Play className="h-5 w-5" /> <span>Process Emails</span>
                       </h3>
                       <button
-                        onClick={handleProcessEmailsForDomain}
-                        disabled={isLoading}
+                        onClick={() => handleProcessEmailsForDomain(selectedDomainForEmail || undefined)}
+                        disabled={
+                          !selectedDomainForEmail ||
+                          (domainEmailStatuses[selectedDomainForEmail] ?? 'pending') !== 'connected' ||
+                          processingDomainId !== null
+                        }
                         className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
                       >
-                        {isLoading ? (
+                        {selectedDomainForEmail && processingDomainId === selectedDomainForEmail ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                           <Play className="h-4 w-4" />
@@ -1255,6 +1253,9 @@ export default function SuperAdminDashboard() {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Email Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Created
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -1263,46 +1264,81 @@ export default function SuperAdminDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {domains.map((domain) => (
-                  <tr key={domain.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">{domain.domain_name}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                      {domain.description || 'No description'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-900">
-                      {domain.user_count}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        domain.is_active 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {domain.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(domain.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleDeleteDomain(domain.id, domain.domain_name);
-                        }}
-                        disabled={isLoading}
-                        className="text-red-600 hover:text-red-900 flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span>Delete</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {domains.map((domain) => {
+                  const emailStatus = domainEmailStatuses[domain.id] ?? 'pending';
+                  const isEmailConnected = emailStatus === 'connected';
+                  const isProcessingDomain = processingDomainId === domain.id;
+                  const isProcessingAnyDomain = processingDomainId !== null;
+
+                  return (
+                    <tr key={domain.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-medium text-gray-900">{domain.domain_name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">
+                        {domain.description || 'No description'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-900">
+                        {domain.user_count}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          domain.is_active
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {domain.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            isEmailConnected ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                          }`}
+                        >
+                          {isEmailConnected ? 'Connected' : 'Pending'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(domain.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center space-x-4">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleProcessEmailsForDomain(domain.id);
+                            }}
+                            disabled={!isEmailConnected || isProcessingAnyDomain}
+                            className="text-green-600 hover:text-green-800 flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isProcessingDomain ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
+                            <span>Process Email</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDeleteDomain(domain.id, domain.domain_name);
+                            }}
+                            disabled={isLoading || processingDomainId !== null}
+                            className="text-red-600 hover:text-red-900 flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
