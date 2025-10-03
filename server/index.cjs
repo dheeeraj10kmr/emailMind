@@ -417,6 +417,29 @@ app.post('/api/domains', async (req, res) => {
   }
 });
 
+app.delete('/api/domains/:id', async (req, res) => {
+  if (req.user.role !== 'super_admin') return res.sendStatus(403);
+
+  const { id } = req.params;
+
+  try {
+    const result = await AuthService.getInstance().deleteDomain(id);
+    res.json({
+      success: true,
+      message: 'Domain deleted successfully',
+      domainId: result.domainId,
+      domainName: result.domainName
+    });
+  } catch (error) {
+    if (error.code === 'DOMAIN_NOT_FOUND') {
+      return res.status(404).json({ success: false, message: 'Domain not found' });
+    }
+
+    logService.log('API_ERROR', 'Failed to delete domain', { error: error.message, domainId: id }, 'ERROR');
+    res.status(500).json({ success: false, message: error.message || 'Failed to delete domain' });
+  }
+});
+
 // /api/configure-email, /api/email-status, /api/test-email, /api/app-settings
 // ... [same logic as original file for brevity, all routes preserved] ...
 // Email connection management (user-level and domain-level)
