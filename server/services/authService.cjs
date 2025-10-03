@@ -164,14 +164,15 @@ async deleteDomain(domainId) {
 
       const domainName = domainResult.rows[0].domain_name;
 
-      const cascadeDeletes = [
-        { table: 'extracted_orders', sql: 'DELETE FROM extracted_orders WHERE domain_id = ?' },
-        { table: 'processed_emails', sql: 'DELETE FROM processed_emails WHERE domain_id = ?' },
-        { table: 'email_connections', sql: 'DELETE FROM email_connections WHERE domain_id = ?' },
-        { table: 'domain_client_mail_map', sql: 'DELETE FROM domain_client_mail_map WHERE domain_id = ?' },
-        { table: 'system_logs', sql: 'DELETE FROM system_logs WHERE domain_id = ?' },
-        { table: 'users', sql: 'DELETE FROM users WHERE domain_id = ?' }
-      ];
+      // REPLACE your current cascadeDeletes array with this:
+const cascadeDeletes = [
+  { table: 'extracted_orders', sql: 'DELETE FROM extracted_orders WHERE domain_id = ?' },
+  { table: 'processed_emails', sql: 'DELETE FROM processed_emails WHERE domain_id = ?' },
+  { table: 'email_connections', sql: 'DELETE FROM email_connections WHERE domain_id = ?' },
+  { table: 'domain_client_mail_map', sql: 'DELETE FROM domain_client_mail_map WHERE domain_id = ?' },
+  { table: 'users', sql: 'DELETE FROM users WHERE domain_id = ?' }
+];
+
 
       for (const step of cascadeDeletes) {
         try {
