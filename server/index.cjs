@@ -446,7 +446,11 @@ app.delete('/api/domains/:id', async (req, res) => {
       req.user?.userId || null,
       req.user?.domainId || id || null
     );
-    return res.sendStatus(403);
+    return res.status(403).json({
+      success: false,
+      message: 'Forbidden: Only super_admin can delete domains.',
+      roleReceived: req.user?.role || null
+    });
   }
 
   try {
