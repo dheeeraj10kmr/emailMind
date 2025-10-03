@@ -91,6 +91,7 @@ export default function SuperAdminDashboard() {
     clientId: '',
     clientSecret: '',
     redirectUri: '',
+    tenantID:'',
     authUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize', // Pre-filled
     tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',   // Pre-filled
     scope: 'Mail.ReadWrite', // Pre-filled
@@ -408,6 +409,7 @@ export default function SuperAdminDashboard() {
       clientId: newEmailConnection.clientId ?? null,
       clientSecret: newEmailConnection.clientSecret ?? null,
       redirectUri: newEmailConnection.redirectUri ?? null,
+      tenantID: newEmailConnection.tenantID ?? null,
       authUrl: newEmailConnection.authUrl ?? null,
       tokenUrl: newEmailConnection.tokenUrl ?? null,
       scope: newEmailConnection.scope ?? null,
@@ -846,7 +848,22 @@ export default function SuperAdminDashboard() {
                           Must match the Redirect URI configured in your Azure AD app registration.
                         </p>
                       </div>
-
+<div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="tenantID">
+                          Tenant ID
+                        </label>
+                        <input
+                          id="tenantID"
+                          type="text"
+                          required
+                          value={newEmailConnection.tenantID}
+                          onChange={(e) =>
+                            setNewEmailConnection({ ...newEmailConnection, tenantID: e.target.value })
+                          }
+                          placeholder="Microsoft Unique Tenant ID. Can be find in Entra Azure under Overview"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
                       {/* New fields for Auth URL, Token URL, Scope */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="authUrl">
