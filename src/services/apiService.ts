@@ -123,12 +123,38 @@ class ApiService {
   }
 
   // Email processing methods
-  async startEmailProcessing(domainId?: string) { // Added optional domainId
-    const query = domainId ? `?domainId=${domainId}` : '';
-    return this.request(`/email-processing/start${query}`, {
-      method: 'POST',
-    });
+ private getStoredDomainId(): string | null {
+    const storedUser = localStorage.getItem('user_data');
+    if (!storedUser) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(storedUser);
+      return parsed.domain_id || parsed.domainId || null;
+    } catch (error) {
+      console.warn('Unable to parse stored user data for domain lookup', error);
+      return null;
+    }
   }
+
+  async startEmailProcessing(domainId?: string) {
+    const targetDomainId = domainId ?? this.getStoredDomainId();
+
+    if (!targetDomainId) {
+      return {
+        success: false,
+        message: 'Domain ID is required to process emails but none was provided.'
+      };
+    }
+
+    const encodedDomainId = encodeURIComponent(targetDomainId);
+
+    return this.request(`/domains/${encodedDomainId}/emails/process-latest`, {
+    method: 'POST',
+  });
+}
+
 
   async getEmailProcessingStatus() {
     return this.request('/email-processing/status');
