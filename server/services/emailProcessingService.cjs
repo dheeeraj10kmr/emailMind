@@ -26,18 +26,138 @@ class EmailProcessingService {
       'route', 'vehicle', 'driver', 'carrier', 'shipper', 'consignee'
     ];
 
-    // Outlook OAuth2 Configuration - will be set dynamically
-   /*
-   this.outlookConfig = {
-      clientId: null,
-      clientSecret: null,
-      redirectUri: null,
-      authorizationUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize', // Standard URL
-      tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token', // Standard URL
-      scope: 'openid profile email offline_access https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send'
+this.extractionKeywords = {
+      customerOrderNumber: [
+        'order number', 'order no', 'order id', 'order reference', 'order ref', 'order code',
+        'order #', 'order identifier', 'order confirmation number', 'order tracking number',
+        'ord no', 'ord num', 'ord id', 'ord ref', 'ord #', 'o/n', 'o#', 'ref no', 'ref id',
+        'purchase number', 'purchase id', 'transaction id', 'confirmation number',
+        'booking number', 'invoice number', 'shipment id', 'delivery number', 'tracking id',
+        'tracking number', 'dispatch id', 'fulfilment order number', 'fulfillment order number',
+        'reference number', 'case id', 'ticket number', 'customer reference', 'your reference',
+        'our reference', 'bestelnummer', 'ordernummer', 'klantnummer', 'referentienummer',
+        'factuurnummer', 'boekingsnummer', 'volgnummer', 'ordernr', 'bestel nr', 'bestel-nr',
+        'order nr', 'ordernr.', 'ref.nr', 'refnr', 'referentie', 'uw referentie', 'onze referentie',
+        'afleveringsnummer', 'verzendnummer', 'leveringsnummer', 'pakbonnummer', 'trackingnummer',
+        'zendingnummer', 'dossiernummer', 'ticketnummer', 'zaaknummer'
+      ],
+      pickupLocationName: [
+        'pickup location', 'pickup point', 'collection point', 'collection location',
+        'pickup address', 'collection address', 'pick-up location', 'pick up location',
+        'pick-up point', 'pickup site', 'pickup store', 'pickup shop', 'pickup depot',
+        'pickup branch', 'pickup outlet', 'collection center', 'collection hub', 'pickup hub',
+        'pickup station', 'pickup locker', 'parcel locker', 'drop-off point', 'pickup parcel shop',
+        'pickup service point', 'pickup kiosk', 'store pickup', 'click and collect',
+        'in-store pickup', 'pickup counter', 'customer collection area', 'pickup desk',
+        'pickup window', 'pickup location name', 'service point name', 'pickup branch name',
+        'parcel shop name', 'collection point name', 'pickup site name', 'fhaallocatie',
+        'afhaalpunt', 'afhaaladres', 'afhaalplaats', 'ophaalpunt', 'ophaalplaats', 'ophaaladres',
+        'collectiepunt', 'afhaalbalie', 'afhaal loc', 'ophaal loc', 'afhaal-locatie',
+        'ophaal-locatie', 'afhaalcentrum', 'ophaalcentrum', 'afhaalhub', 'ophaalhub',
+        'pakketautomaat', 'winkelafhaling', 'afhalen in winkel', 'afhaalwinkel', 'afhaalservice',
+        'klantenbalie', 'vestiging', 'filiaal', 'punt', 'balie', 'centrum', 'gebouw'
+      ],
+      pickupLocationPostalCode: [
+        'pickup postal code', 'pickup postcode', 'pickup zip code', 'collection postcode',
+        'pickup location postal code', 'pickup location zip', 'pickup zip', 'pickup postal',
+        'collection zip', 'collection code', 'afhaalpostcode', 'ophaalpostcode',
+        'afhaal postnummer', 'ophaal postnummer', 'afhaallocatie postcode',
+        'afhaalpunt postcode', 'ophaalpunt postcode', 'collectiepunt postcode'
+      ],
+      pickupDate: [
+        'pickup date', 'pick-up date', 'collection date', 'collect date', 'pickup day',
+        'collection day', 'afhaaldatum', 'ophaalmoment', 'collectiedatum', 'ophaaldatum'
+      ],
+      pickupContact: [
+        'pickup contact', 'collection contact', 'pickup contact person', 'contact person',
+        'contactpersoon', 'pickup phone', 'pickup contact name', 'collection contact name',
+        'pickup contact details', 'pickup telephone'
+      ],
+      pickupLocationAddress: [
+        'pickup address', 'pickup location address', 'pickup street', 'pickup address line',
+        'collection address', 'pickup site address', 'pickup street address',
+        'pickup location line', 'pickup full address', 'afhaaladres', 'ophaaladres',
+        'afhaallocatie adres', 'afhaaladreslijn', 'afhaal straat', 'ophaal straat',
+        'afhaal locatie', 'afhaalplaats adres', 'collectieadres', 'afhaaladres volledig'
+      ],
+      pickupLocationCity: [
+        'pickup city', 'collection city', 'pickup town', 'collection town', 'pickup municipality',
+        'collection municipality', 'afhaalstad', 'ophaalstad', 'afhaalplaats', 'ophaalplaats stad'
+      ],
+      pickupLocationState: [
+        'pickup state', 'pickup province', 'pickup region', 'collection province',
+        'collection region', 'afhaal provincie', 'afhaalregio', 'ophaal provincie', 'ophaalregio'
+      ],
+      pickupLocationCountryCode: [
+        'pickup country', 'pickup country code', 'pickup location country', 'pickup nation',
+        'collection country', 'pickup location country code', 'pickup country iso code',
+        'afhaal land', 'afhaallandcode', 'afhaallocatie land', 'afhaallocatie landcode',
+        'ophaalland', 'ophaallandcode', 'afhaal land code', 'collectie land', 'collectie landcode'
+      ],
+      deliveryLocationName: [
+        'delivery location name', 'delivery name', 'recipient name', 'delivery point name',
+        'delivery contact name', 'delivery branch name', 'delivery store name',
+        'delivery depot name', 'delivery address name', 'leverlocatie naam',
+        'afleverlocatie naam', 'leveringslocatie naam', 'afleverpunt naam', 'ontvanger naam',
+        'bezorgpunt naam', 'leveringspunt naam', 'afgiftepunt naam', 'afleveradres naam',
+        'bezorglocatie naam'
+      ],
+      deliveryLocationPostalCode: [
+        'delivery postal code', 'delivery zip code', 'delivery postcode', 'destination postcode',
+        'delivery postal', 'delivery postal no', 'recipient postal code',
+        'delivery location zip', 'delivery zip', 'afleverpostcode', 'bezorgpostcode',
+        'leveringspostcode', 'leverings postnummer', 'aflever postnummer', 'bezorg postnummer',
+        'bezorglocatie postcode', 'afleverlocatie postcode', 'leveradres postcode'
+      ],
+      deliveryLocationAddress: [
+        'delivery address', 'delivery location address', 'delivery street',
+        'destination address', 'shipping address', 'recipient address',
+        'delivery address line', 'delivery full address', 'delivery address info',
+        'afleveradres', 'bezorgadres', 'leveringsadres', 'afleveringsadres',
+        'bezorglocatie adres', 'leveradres', 'afleverlocatie adres', 'afgifteadres',
+        'afleveradreslijn', 'afleveradres volledig'
+      ],
+      deliveryLocationCity: [
+        'delivery city', 'destination city', 'recipient city', 'shipping city',
+        'bezorgstad', 'afleverstad', 'leveringsstad', 'bestemmingsstad'
+      ],
+      deliveryLocationState: [
+        'delivery state', 'delivery province', 'delivery region', 'destination province',
+        'destination region', 'afleverprovincie', 'bezorgprovincie', 'leveringsregio'
+      ],
+      deliveryLocationCountryCode: [
+        'delivery country', 'delivery country code', 'destination country',
+        'destination country code', 'shipping country', 'shipping country code',
+        'delivery location country', 'recipient country', 'delivery country iso code',
+        'afleverland', 'bezorgland', 'leveringsland', 'afleverlandcode', 'bezorglandcode',
+        'leveringslandcode', 'afleverlocatie land', 'leverlocatie landcode',
+        'bezorg locatie land', 'afgifte land'
+      ]
     };
-	*/
-  }
+
+    this.countryNameToIso = {
+      netherlands: 'NL', nederland: 'NL', holland: 'NL',
+      germany: 'DE', deutschland: 'DE',
+      belgium: 'BE', belgie: 'BE', belgië: 'BE',
+      france: 'FR', frankrijk: 'FR',
+      spain: 'ES', espana: 'ES', españa: 'ES',
+      italy: 'IT', italia: 'IT',
+      unitedkingdom: 'GB', uk: 'GB', britain: 'GB', england: 'GB',
+      scotland: 'GB', wales: 'GB', ireland: 'IE',
+      poland: 'PL', nederlanden: 'NL',
+      sweden: 'SE', sverige: 'SE',
+      norway: 'NO', norge: 'NO',
+      denmark: 'DK', danmark: 'DK',
+      finland: 'FI', suomi: 'FI',
+      switzerland: 'CH', schweiz: 'CH', suisse: 'CH',
+      austria: 'AT', osterreich: 'AT', österreich: 'AT',
+      unitedstates: 'US', usa: 'US', america: 'US',
+      canada: 'CA', mexico: 'MX', australia: 'AU', newzealand: 'NZ',
+      china: 'CN', india: 'IN', japan: 'JP', southkorea: 'KR', korea: 'KR',
+      brazil: 'BR', argentina: 'AR', chile: 'CL', peru: 'PE',
+      southafrica: 'ZA', africa: 'ZA', uae: 'AE', emirates: 'AE',
+      singapore: 'SG', malaysia: 'MY', indonesia: 'ID'
+    };
 
   static getInstance() {
     if (!EmailProcessingService.instance) {
@@ -46,7 +166,6 @@ class EmailProcessingService {
     return EmailProcessingService.instance;
   }
 setOutlookConfig(config) {
-    // Backwards compatibility: older code sets a global Outlook config.
     // Newer flows store per-connection credentials, so we just keep this
     // for logging & diagnostics and do not rely on it elsewhere.
     this._legacyOutlookConfig = { ...(this._legacyOutlookConfig || {}), ...(config || {}) };
@@ -60,16 +179,7 @@ setOutlookConfig(config) {
       }
     );
   }
-  // NEW: Method to set Outlook config dynamically
-  /*
-  setOutlookConfig(config) {
-    this.outlookConfig = { ...this.outlookConfig, ...config };
-    this.logService.log('EMAIL_OUTLOOK_CONFIG_UPDATED', 'Outlook configuration updated', {
-      clientId: config.clientId ? 'configured' : 'not configured',
-      redirectUri: config.redirectUri
-    });
-  }
-*/
+
   // Encrypt stored credentials/tokens using ConfigService's encryption key
   encryptCredentials(data) {
     try {
@@ -88,6 +198,182 @@ setOutlookConfig(config) {
       this.logService.log('EMAIL_DECRYPT_ERROR', 'Failed to decrypt credentials', { error: error.message }, 'ERROR');
       throw new Error('Decryption failed');
     }
+  }
+
+escapeRegex(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  cleanExtractedValue(value, options = {}) {
+    if (!value) {
+      return null;
+    }
+
+    let cleaned = value
+      .replace(/^[=:\-\s]+/, '')
+      .replace(/\r/g, ' ')
+      .replace(/\t/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
+    if (options.stopChars) {
+      const stopRegex = new RegExp(`[${options.stopChars}]`);
+      const parts = cleaned.split(stopRegex);
+      cleaned = parts[0].trim();
+    }
+
+    cleaned = cleaned.replace(/[\s,;]+$/, '').trim();
+
+    if (options.pattern) {
+      const match = cleaned.match(options.pattern);
+      if (!match) {
+        return null;
+      }
+      cleaned = (match[1] || match[0]).trim();
+    }
+
+    if (options.transform) {
+      cleaned = options.transform(cleaned);
+    }
+
+    if (options.maxLength) {
+      cleaned = cleaned.substring(0, options.maxLength);
+    }
+
+    return cleaned || null;
+  }
+
+  extractValueFromLine(line, keyword, options = {}, skipKeyword = false) {
+    if (!line) {
+      return '';
+    }
+
+    if (skipKeyword) {
+      return line.trim();
+    }
+
+    const keywordPattern = new RegExp(`${this.escapeRegex(keyword)}\\s*(?:[:=\-]|is)?\\s*(.+)`, 'i');
+    const keywordMatch = line.match(keywordPattern);
+    if (keywordMatch && keywordMatch[1]) {
+      return keywordMatch[1].trim();
+    }
+
+    const fallbackPattern = new RegExp(`${this.escapeRegex(keyword)}[^A-Za-z0-9]*([A-Za-z0-9#\\/\\-_,.\s]+)`, 'i');
+    const fallbackMatch = line.match(fallbackPattern);
+    if (fallbackMatch && fallbackMatch[1]) {
+      return fallbackMatch[1].trim();
+    }
+
+    return '';
+  }
+
+  findValueByKeywords(emailContent, keywords, options = {}) {
+    if (!emailContent || !Array.isArray(keywords)) {
+      return null;
+    }
+
+    const lines = emailContent.split(/\r?\n/);
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lowerLine = line.toLowerCase();
+
+      for (const keyword of keywords) {
+        if (!keyword) {
+          continue;
+        }
+
+        if (!lowerLine.includes(keyword.toLowerCase())) {
+          continue;
+        }
+
+        let rawValue = this.extractValueFromLine(line, keyword, options);
+        if ((!rawValue || !rawValue.trim()) && lines[i + 1]) {
+          rawValue = this.extractValueFromLine(lines[i + 1], keyword, options, true);
+        }
+
+        const cleanedValue = this.cleanExtractedValue(rawValue, options);
+        if (cleanedValue) {
+          return { value: cleanedValue, keyword };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  normalizeOrderNumber(value) {
+    if (!value) {
+      return null;
+    }
+    const sanitized = value.replace(/[^A-Za-z0-9#\/-]/g, '').toUpperCase();
+    return sanitized || null;
+  }
+
+  normalizePostalCode(value) {
+    if (!value) {
+      return null;
+    }
+    const match = value.match(/[A-Z0-9][A-Z0-9\s-]{2,9}/i);
+    if (match) {
+      return match[0].replace(/\s{2,}/g, ' ').trim().toUpperCase();
+    }
+    return value.trim().toUpperCase();
+  }
+
+  normalizeCountryCode(value) {
+    if (!value) {
+      return null;
+    }
+    const alphaOnly = value.replace(/[^A-Za-z]/g, '').toLowerCase();
+    if (!alphaOnly) {
+      return null;
+    }
+    if (alphaOnly.length <= 3) {
+      return alphaOnly.toUpperCase();
+    }
+    if (this.countryNameToIso[alphaOnly]) {
+      return this.countryNameToIso[alphaOnly];
+    }
+    return alphaOnly.substring(0, 2).toUpperCase();
+  }
+
+  normalizeDateValue(value) {
+    if (!value) {
+      return null;
+    }
+
+    const trimmed = value.trim();
+
+    const isoMatch = trimmed.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+    if (isoMatch) {
+      const [, year, month, day] = isoMatch;
+      return `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    const euroMatch = trimmed.match(/(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/);
+    if (euroMatch) {
+      let [, day, month, year] = euroMatch;
+      if (year.length === 2) {
+        year = `20${year}`;
+      }
+      return `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    const textMatch = trimmed.match(/([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?(?:,)?\s+(\d{2,4})/);
+    if (textMatch) {
+      const parsed = new Date(trimmed.replace(/(\d{1,2})(st|nd|rd|th)/, '$1'));
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toISOString().split('T')[0];
+      }
+    }
+
+    const parsedDate = new Date(trimmed);
+    if (!Number.isNaN(parsedDate.getTime())) {
+      return parsedDate.toISOString().split('T')[0];
+    }
+
+    return null;
   }
 
    async refreshDomainConnectionTokens(connection) {
@@ -433,70 +719,199 @@ setOutlookConfig(config) {
   // Extract order information from email
   extractOrderInformation(emailContent, subject) {
     try {
-      const content = emailContent.toLowerCase();
+      const content = emailContent || '';
+      const rawMatches = {};
+      const takeFirstLine = value => value.split(/\r?\n/)[0].trim();
       const extractedData = {};
 
       // Extract order number (simple pattern matching)
-      const orderNumberPatterns = [
-        /order\s*#?\s*(\w+)/i,
-        /order\s*number\s*:?\s*(\w+)/i,
-        /ref\s*:?\s*(\w+)/i
-      ];
-
-      for (const pattern of orderNumberPatterns) {
-        const match = content.match(pattern);
-        if (match) {
-          extractedData.orderNumber = match[1];
-          break;
+      const orderMatch = this.findValueByKeywords(content, this.extractionKeywords.customerOrderNumber, {
+        pattern: /([A-Z0-9][A-Z0-9#\/-]{3,})/i,
+        transform: value => this.normalizeOrderNumber(value)
+      });
+      if (orderMatch) {
+        extractedData.customerOrderNumber = orderMatch.value;
+        extractedData.orderNumber = orderMatch.value;
+        rawMatches.customerOrderNumber = orderMatch;
+      } else {
+        const fallback = content.match(/(?:order|ord|ref|tracking)[^A-Za-z0-9]{0,10}([A-Z0-9#\/-]{4,})/i);
+        if (fallback && fallback[1]) {
+          const normalized = this.normalizeOrderNumber(fallback[1]);
+          if (normalized) {
+            extractedData.customerOrderNumber = normalized;
+            extractedData.orderNumber = normalized;
+          }
         }
       }
 
       // Extract weight information
-      const weightPatterns = [
-        /(\d+(?:\.\d+)?)\s*(kg|kilograms?|lbs?|pounds?|tons?)/i,
-        /weight\s*:?\s*(\d+(?:\.\d+)?)/i
-      ];
+      const pickupName = this.findValueByKeywords(content, this.extractionKeywords.pickupLocationName, {
+        transform: takeFirstLine,
+        maxLength: 120
+      });
+      if (pickupName) {
+        extractedData.pickupLocationName = pickupName.value;
+        rawMatches.pickupLocationName = pickupName;
+      }
 
-      for (const pattern of weightPatterns) {
-        const match = content.match(pattern);
-        if (match) {
-          extractedData.weight = parseFloat(match[1]);
-          extractedData.weightUnit = match[2] || 'kg';
-          break;
-        }
+      const pickupPostal = this.findValueByKeywords(content, this.extractionKeywords.pickupLocationPostalCode, {
+        pattern: /([A-Z0-9][A-Z0-9\s-]{3,9})/i,
+        transform: value => this.normalizePostalCode(value)
+      });
+      if (pickupPostal) {
+        extractedData.pickupLocationPostalCode = pickupPostal.value;
+        extractedData.pickupPostal = pickupPostal.value;
+        rawMatches.pickupLocationPostalCode = pickupPostal;
       }
 
       // Extract package count
-      const packagePatterns = [
-        /(\d+)\s*packages?/i,
-        /(\d+)\s*boxes?/i,
-        /(\d+)\s*items?/i
-      ];
+      const pickupAddress = this.findValueByKeywords(content, this.extractionKeywords.pickupLocationAddress, {
+        transform: takeFirstLine,
+        maxLength: 200
+      });
+      if (pickupAddress) {
+        extractedData.pickupLocationAddress = pickupAddress.value;
+        extractedData.pickupAddress = pickupAddress.value;
+        rawMatches.pickupLocationAddress = pickupAddress;
+      }
 
-      for (const pattern of packagePatterns) {
-        const match = content.match(pattern);
-        if (match) {
-          extractedData.packageCount = parseInt(match[1]);
-          break;
-        }
+      const pickupCity = this.findValueByKeywords(content, this.extractionKeywords.pickupLocationCity, {
+        transform: takeFirstLine,
+        maxLength: 120
+      });
+      if (pickupCity) {
+        extractedData.pickupLocationCity = pickupCity.value;
+        extractedData.pickupCity = pickupCity.value;
+        rawMatches.pickupLocationCity = pickupCity;
       }
 
       // Extract customer name (simple pattern)
-      const customerPatterns = [
-        /customer\s*:?\s*([^\n\r]+)/i,
-        /client\s*:?\s*([^\n\r]+)/i,
-        /company\s*:?\s*([^\n\r]+)/i
-      ];
-
-      for (const pattern of customerPatterns) {
-        const match = content.match(pattern);
-        if (match) {
-          extractedData.customerName = match[1].trim();
-          break;
-        }
+      const pickupState = this.findValueByKeywords(content, this.extractionKeywords.pickupLocationState, {
+        transform: takeFirstLine,
+        maxLength: 120
+      });
+      if (pickupState) {
+        extractedData.pickupLocationState = pickupState.value;
+        extractedData.pickupState = pickupState.value;
+        rawMatches.pickupLocationState = pickupState;
       }
 
-      this.logService.log('EMAIL_ORDER_EXTRACTION', 'Order information extracted', extractedData);
+      const pickupCountry = this.findValueByKeywords(content, this.extractionKeywords.pickupLocationCountryCode, {
+        transform: value => this.normalizeCountryCode(value)
+      });
+      if (pickupCountry) {
+        extractedData.pickupLocationCountryCode = pickupCountry.value;
+        extractedData.pickupCountry = pickupCountry.value;
+        rawMatches.pickupLocationCountryCode = pickupCountry;
+      }
+
+      const pickupDate = this.findValueByKeywords(content, this.extractionKeywords.pickupDate, {
+        pattern: /(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\d{4}[\/-]\d{1,2}[\/-]\d{1,2}|[A-Za-z]{3,9}\s+\d{1,2}(?:st|nd|rd|th)?(?:,)?\s+\d{2,4})/,
+        transform: value => this.normalizeDateValue(value)
+      });
+      if (pickupDate) {
+        extractedData.pickupDate = pickupDate.value;
+        rawMatches.pickupDate = pickupDate;
+      }
+
+      const pickupContact = this.findValueByKeywords(content, this.extractionKeywords.pickupContact, {
+        transform: takeFirstLine,
+        maxLength: 120
+      });
+      if (pickupContact) {
+        extractedData.pickupContact = pickupContact.value;
+        rawMatches.pickupContact = pickupContact;
+      }
+
+      const deliveryName = this.findValueByKeywords(content, this.extractionKeywords.deliveryLocationName, {
+        transform: takeFirstLine,
+        maxLength: 120
+      });
+      if (deliveryName) {
+        extractedData.deliveryLocationName = deliveryName.value;
+        rawMatches.deliveryLocationName = deliveryName;
+      }
+
+      const deliveryPostal = this.findValueByKeywords(content, this.extractionKeywords.deliveryLocationPostalCode, {
+        pattern: /([A-Z0-9][A-Z0-9\s-]{3,9})/i,
+        transform: value => this.normalizePostalCode(value)
+      });
+      if (deliveryPostal) {
+        extractedData.deliveryLocationPostalCode = deliveryPostal.value;
+        extractedData.deliveryPostal = deliveryPostal.value;
+        rawMatches.deliveryLocationPostalCode = deliveryPostal;
+      }
+
+      const deliveryAddress = this.findValueByKeywords(content, this.extractionKeywords.deliveryLocationAddress, {
+        transform: takeFirstLine,
+        maxLength: 200
+      });
+      if (deliveryAddress) {
+        extractedData.deliveryLocationAddress = deliveryAddress.value;
+        extractedData.deliveryAddress = deliveryAddress.value;
+        rawMatches.deliveryLocationAddress = deliveryAddress;
+      }
+
+      const deliveryCity = this.findValueByKeywords(content, this.extractionKeywords.deliveryLocationCity, {
+        transform: takeFirstLine,
+        maxLength: 120
+      });
+      if (deliveryCity) {
+        extractedData.deliveryLocationCity = deliveryCity.value;
+        extractedData.deliveryCity = deliveryCity.value;
+        rawMatches.deliveryLocationCity = deliveryCity;
+      }
+
+      const deliveryState = this.findValueByKeywords(content, this.extractionKeywords.deliveryLocationState, {
+        transform: takeFirstLine,
+        maxLength: 120
+      });
+      if (deliveryState) {
+        extractedData.deliveryLocationState = deliveryState.value;
+        extractedData.deliveryState = deliveryState.value;
+        rawMatches.deliveryLocationState = deliveryState;
+      }
+
+      const deliveryCountry = this.findValueByKeywords(content, this.extractionKeywords.deliveryLocationCountryCode, {
+        transform: value => this.normalizeCountryCode(value)
+      });
+      if (deliveryCountry) {
+        extractedData.deliveryLocationCountryCode = deliveryCountry.value;
+        extractedData.deliveryCountry = deliveryCountry.value;
+        rawMatches.deliveryLocationCountryCode = deliveryCountry;
+      }
+
+      const weightMatch = content.match(/(\d+(?:\.\d+)?)\s*(kg|kilograms?|kgs|lbs?|pounds?|tons?)/i);
+      if (weightMatch) {
+        extractedData.weight = parseFloat(weightMatch[1]);
+        extractedData.weightUnit = weightMatch[2] ? weightMatch[2].toLowerCase() : 'kg';
+        rawMatches.weight = { keyword: 'weight', value: `${weightMatch[1]} ${weightMatch[2] || ''}`.trim() };
+      }
+
+      const packageMatch = content.match(/(\d+)\s*(packages?|boxes?|items?|colli|pallets?)/i);
+      if (packageMatch) {
+        extractedData.packageCount = parseInt(packageMatch[1], 10);
+        rawMatches.packageCount = { keyword: 'package', value: packageMatch[0] };
+      }
+
+      const customerMatch = content.match(/(?:customer|client|company|attn|attention)\s*[:\-]?\s*([^\r\n]+)/i);
+      if (customerMatch) {
+        extractedData.customerName = customerMatch[1].trim();
+        rawMatches.customerName = { keyword: 'customer', value: customerMatch[1].trim() };
+      }
+
+      if (!extractedData.description) {
+        const trimmedBody = content.replace(/\s+/g, ' ').trim();
+        extractedData.description = subject || trimmedBody.substring(0, 200);
+      }
+
+      extractedData.rawMatches = rawMatches;
+
+      this.logService.log('EMAIL_ORDER_EXTRACTION', 'Order information extracted', {
+        customerOrderNumber: extractedData.customerOrderNumber,
+        pickupLocationName: extractedData.pickupLocationName,
+        deliveryLocationName: extractedData.deliveryLocationName
+      });
 
       return extractedData;
     } catch (error) {
@@ -508,34 +923,44 @@ setOutlookConfig(config) {
   // Generate XML for Oracle API
   generateOrderXML(orderData) {
     try {
+      const orderId = orderData.customerOrderNumber || orderData.orderNumber || `AUTO_${Date.now()}`;
+      const pickupAddress = orderData.pickupLocationAddress || orderData.pickupAddress || 'TBD';
+      const pickupCity = orderData.pickupLocationCity || orderData.pickupCity || 'TBD';
+      const pickupPostal = orderData.pickupLocationPostalCode || orderData.pickupPostal || 'TBD';
+      const pickupCountry = orderData.pickupLocationCountryCode || orderData.pickupCountry || 'TBD';
+      const deliveryAddress = orderData.deliveryLocationAddress || orderData.deliveryAddress || 'TBD';
+      const deliveryCity = orderData.deliveryLocationCity || orderData.deliveryCity || 'TBD';
+      const deliveryPostal = orderData.deliveryLocationPostalCode || orderData.deliveryPostal || 'TBD';
+      const deliveryCountry = orderData.deliveryLocationCountryCode || orderData.deliveryCountry || 'TBD';
+      const weightUnit = (orderData.weightUnit || 'kg').toUpperCase();
       const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <TransportOrder>
-    <OrderID>${orderData.orderNumber || 'AUTO_' + Date.now()}</OrderID>
+    <OrderID>${orderId}</OrderID>
     <CustomerName>${orderData.customerName || 'Unknown Customer'}</CustomerName>
     <OrderDate>${new Date().toISOString().split('T')[0]}</OrderDate>
     <PickupLocation>
-        <Address>${orderData.pickupAddress || 'TBD'}</Address>
-        <City>${orderData.pickupCity || 'TBD'}</City>
-        <PostalCode>${orderData.pickupPostal || 'TBD'}</PostalCode>
-        <Country>${orderData.pickupCountry || 'TBD'}</Country>
+        <Address>${pickupAddress}</Address>
+        <City>${pickupCity}</City>
+        <PostalCode>${pickupPostal}</PostalCode>
+        <Country>${pickupCountry}</Country>
     </PickupLocation>
     <DeliveryLocation>
-        <Address>${orderData.deliveryAddress || 'TBD'}</Address>
-        <City>${orderData.deliveryCity || 'TBD'}</City>
-        <PostalCode>${orderData.deliveryPostal || 'TBD'}</PostalCode>
-        <Country>${orderData.deliveryCountry || 'TBD'}</Country>
+        <Address>${deliveryAddress}</Address>
+        <City>${deliveryCity}</City>
+        <PostalCode>${deliveryPostal}</PostalCode>
+        <Country>${deliveryCountry}</Country>
     </DeliveryLocation>
     <ShipmentDetails>
         <Weight>${orderData.weight || 0}</Weight>
-        <WeightUnit>${orderData.weightUnit || 'kg'}</WeightUnit>
+        <WeightUnit>${weightUnit}</WeightUnit>
         <PackageCount>${orderData.packageCount || 1}</PackageCount>
         <Description>${orderData.description || 'Logistics shipment'}</Description>
     </ShipmentDetails>
     <ProcessedDate>${new Date().toISOString()}</ProcessedDate>
 </TransportOrder>`;
 
-      this.logService.log('EMAIL_XML_GENERATION', 'XML generated for order', { 
-        orderNumber: orderData.orderNumber 
+      this.logService.log('EMAIL_XML_GENERATION', 'XML generated for order', {
+        orderNumber: orderData.customerOrderNumber || orderData.orderNumber
       });
 
       return xml;
@@ -567,18 +992,27 @@ setOutlookConfig(config) {
       yesterday.setDate(yesterday.getDate() - 1);
       
       // Fetch messages with body structure to detect attachments
-      const messages = await client.fetch({
+      const fetchedMessages = [];
+      for await (const message of client.fetch({
         since: yesterday
       }, {
         envelope: true,
         bodyText: true,
         bodyStructure: true // Request body structure to detect attachments
+        })) {
+        fetchedMessages.push(message);
+      }
+
+      fetchedMessages.sort((a, b) => {
+        const dateA = a.envelope?.date ? new Date(a.envelope.date).getTime() : 0;
+        const dateB = b.envelope?.date ? new Date(b.envelope.date).getTime() : 0;
+        return dateB - dateA;
       });
 
       let processedCount = 0;
       const db = DatabaseManager.getInstance();
 
-      for await (const message of messages) {
+      for (const message of fetchedMessages) {
         try {
           const emailId = message.envelope.messageId || `msg_${message.seq}`;
           const subject = message.envelope.subject || 'No Subject';
@@ -644,30 +1078,60 @@ setOutlookConfig(config) {
             const xml = this.generateOrderXML(orderData);
 
             // Store extracted order
-            const extractedOrderId = crypto.randomUUID().replace(/-/g, ''); 
-            await db.query(`
-              INSERT INTO extracted_orders (
-                id, processed_email_id, domain_id, order_number, customer_name,
-                pickup_location, delivery_location, weight, weight_unit,
-                package_count, description, extracted_data, xml_generated, created_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-            `, [
-              extractedOrderId, processedEmailId, connection.domain_id,
-              orderData.orderNumber || null, orderData.customerName || null,
-              JSON.stringify({}), JSON.stringify({}), orderData.weight || null,
-              orderData.weightUnit || 'kg', orderData.packageCount || null,
-              orderData.description || subject, JSON.stringify(orderData), xml
-            ]);
+            const extractedOrderId = crypto.randomUUID().replace(/-/g, '');
+            const orderRecord = {
+              id: extractedOrderId,
+              processed_email_id: processedEmailId,
+              domain_id: connection.domain_id,
+              customer_order_number: orderData.customerOrderNumber || orderData.orderNumber || null,
+              customer_name: orderData.customerName || null,
+              pickup_location_name: orderData.pickupLocationName || null,
+              pickup_date: orderData.pickupDate || null,
+              pickup_contact: orderData.pickupContact || null,
+              package_count: orderData.packageCount || null,
+              description: orderData.description || subject,
+              weight_unit: (orderData.weightUnit || 'kg').toUpperCase(),
+              weight: orderData.weight || null,
+              pickup_location_postal_code: orderData.pickupLocationPostalCode || null,
+              pickup_location_country_code: orderData.pickupLocationCountryCode
+                ? orderData.pickupLocationCountryCode.toUpperCase()
+                : null,
+              pickup_location_address: orderData.pickupLocationAddress || null,
+              pickup_location_city: orderData.pickupLocationCity || null,
+              pickup_location_state: orderData.pickupLocationState || null,
+              delivery_location_name: orderData.deliveryLocationName || null,
+              delivery_location_postal_code: orderData.deliveryLocationPostalCode || null,
+              delivery_location_country_code: orderData.deliveryLocationCountryCode
+                ? orderData.deliveryLocationCountryCode.toUpperCase()
+                : null,
+              delivery_location_address: orderData.deliveryLocationAddress || null,
+              delivery_location_city: orderData.deliveryLocationCity || null,
+              delivery_location_state: orderData.deliveryLocationState || null,
+              xml_generated: xml,
+              confidence_percentage: Math.round((analysis.confidenceScore || 0) * 100),
+              extracted_data: JSON.stringify(orderData.rawMatches || orderData)
+            };
+
+            const orderColumns = Object.keys(orderRecord);
+            const orderValues = orderColumns.map(column => orderRecord[column] ?? null);
+
+            await db.query(
+              `INSERT INTO extracted_orders (${orderColumns.join(', ')}) VALUES (${orderColumns.map(() => '?').join(', ')})`,
+              orderValues
+            );
 
             this.logService.log('EMAIL_ORDER_EXTRACTED', 'Order extracted from email', {
               email: connection.email_address,
               subject,
-              orderNumber: orderData.orderNumber,
+              orderNumber: orderData.customerOrderNumber || orderData.orderNumber,
               confidence: analysis.confidenceScore
             });
           }
 
           processedCount++;
+          if (processedCount > 0) {
+            break; // Only process the most recent unprocessed email
+          }
         } catch (emailError) {
           this.logService.log('EMAIL_PROCESS_EMAIL_ERROR', 'Failed to process individual email', {
             error: emailError.message,
