@@ -365,29 +365,20 @@ app.use(authenticateToken);
 
 
 // ---- Email Processing Routes ----
-app.post('/api/email-processing/start', async (req, res) => {
+app.post('/api/domains/:domainId/emails/process-latest', async (req, res) => {
   try {
-    const requestedDomainId = req.query.domainId || req.body?.domainId || null;
-    const isSuperAdmin = req.user.role === 'super_admin';
+    const { domainId } = req.params;
+    const emailProcessingService = EmailProcessingService.getInstance();
+    const requesterIsSuperAdmin = req.user.role === 'super_admin';
 
-    if (requestedDomainId && !isSuperAdmin && req.user.domainId !== requestedDomainId) {
+    if (!requesterIsSuperAdmin && req.user.domainId !== domainId) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to process emails for this domain.'
       });
     }
 
-    const targetDomainId = isSuperAdmin ? requestedDomainId || null : req.user.domainId;
-    if (!targetDomainId && !isSuperAdmin) {
-      return res.status(400).json({
-        success: false,
-        message: 'Domain context is required for email processing.'
-      });
-    }
-
-    const emailProcessingService = EmailProcessingService.getInstance();
     const { isProcessing } = emailProcessingService.getProcessingStatus();
-
     if (isProcessing) {
       return res.status(409).json({
         success: false,
@@ -395,33 +386,42 @@ app.post('/api/email-processing/start', async (req, res) => {
       });
     }
 
-    emailProcessingService
-      .processAllConnections(targetDomainId)
-      .catch(error => {
-        logService.log(
-          'EMAIL_PROCESS_MANUAL_ERROR',
-          'Manual email processing failed after response',
-          { error: error.message, domainId: targetDomainId },
-          'ERROR'
-        );
-      });
+    // Trigger email processing asynchronously
+    emailProcessingService.processAllConnections(domainId).catch(error => {
+      logService.log(
+        'EMAIL_PROCESS_MANUAL_ERROR',
+        'Manual email processing failed after response',
+        { error: error.message, domainId },
+        'ERROR'
+      );
+    });
 
     logService.log(
       'EMAIL_PROCESS_MANUAL_TRIGGERED',
-      'Manual email processing triggered via API',
-      { requestedDomainId: targetDomainId, userId: req.user.userId },
+      'Manual email processing triggered via domain route',
+      { domainId, userId: req.user.userId },
       'INFO'
     );
 
-    return res.status(202).json({ success: true, message: 'Email processing started.' });
+    return res.status(202).json({
+      success: true,
+      message: 'Email processing started.'
+    });
   } catch (error) {
-    logService.log('EMAIL_PROCESS_MANUAL_ROUTE_ERROR', 'Failed to start email processing', {
-      error: error.message
-    }, 'ERROR');
+    logService.log(
+      'EMAIL_PROCESS_MANUAL_ROUTE_ERROR',
+      'Failed to start email processing',
+      { error: error.message },
+      'ERROR'
+    );
 
-    return res.status(500).json({ success: false, message: 'Failed to start email processing.' });
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to start email processing.'
+    });
   }
 });
+
 
 app.get('/api/email-processing/status', (req, res) => {
   try {
