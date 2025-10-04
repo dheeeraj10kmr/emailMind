@@ -158,7 +158,7 @@ this.extractionKeywords = {
       southafrica: 'ZA', africa: 'ZA', uae: 'AE', emirates: 'AE',
       singapore: 'SG', malaysia: 'MY', indonesia: 'ID'
     };
-
+  }
   static getInstance() {
     if (!EmailProcessingService.instance) {
       EmailProcessingService.instance = new EmailProcessingService();
