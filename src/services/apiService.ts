@@ -100,13 +100,12 @@ class ApiService {
     return this.request('/domains');
   }
 
-  async deleteDomain(id: string) { // NEW
-			
-    return this.request(`/domains/${id}`, { // Corrected endpoint path
-      method: 'DELETE',
-		  
-    });
-  }
+ async deleteDomain(id: string) {
+  return this.request(`/domains/${id}/delete`, {
+    method: 'POST',
+  });
+}
+
 
   // Removed domain-smtp-settings methods
 
